@@ -1,0 +1,225 @@
+{% extends "base/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <h4 class="fw-bold" style="color: var(--sp-navy)">Project Insights — {{ project.project_name }}</h4>
+  <a href="{% url 'projects:detail' project.pk %}" class="btn btn-sm btn-outline-secondary">&larr; Back to Dashboard
+    View</a>
+</div>
+<br>
+<!-- <p class="text-muted small">Everything the import found beyond the core KPIs — kept off the main dashboard so that
+  stays scannable, but nothing from the source file/sheet is thrown away.</p> -->
+
+<!-- {% if user.profile.can_edit_projects %}
+<div class="sp-panel">
+  <h6>Selected Column Configuration</h6>
+  <p class="small text-muted mb-2">Pick which Inventory sheet column to SUM for this project's Delivered Records
+    (Project Status) and Received Records (Branch Status) below. Only needs to be set once — re-selecting anytime
+    updates both panels immediately.</p>
+  <form method="post" class="row g-2 align-items-end">
+    {% csrf_token %}
+    <div class="col-md-5">
+      <label class="form-label small fw-semibold mb-1">Delivered Records column (Project Status)</label>
+      <select name="delivered_column_key" class="form-select form-select-sm">
+        <option value="">— Not selected —</option>
+        {% for key, label in column_choices.items %}
+        <option value="{{ key }}" {% if project.delivered_column_key == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-5">
+      <label class="form-label small fw-semibold mb-1">Received Records column (Branch Status)</label>
+      <select name="received_column_key" class="form-select form-select-sm">
+        <option value="">— Not selected —</option>
+        {% for key, label in column_choices.items %}
+        <option value="{{ key }}" {% if project.received_column_key == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-sm btn-primary w-100">Save</button>
+    </div>
+  </form>
+</div>
+{% endif %} -->
+
+<!-- {% if user.profile.can_edit_projects %}
+<div class="sp-panel">
+  <h6>Batches Being Processed Configuration</h6>
+  <p class="small text-muted mb-2"><strong>No. of Batches − No. of Batches Shipped = No. of Batches Being
+    Keyed</strong> — this is already live below using your Shipment Date. Optionally refine it further: pick the
+    Inventory column that carries each batch's keying status, then which value in that column means "Keyed", to
+    also leave out rows that are WIP or blank in that column.</p>
+  <form method="post" class="row g-2 align-items-end">
+    {% csrf_token %}
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold mb-1">Status column <span class="text-muted fw-normal">(optional)</span></label>
+      <select name="batches_status_column_key" class="form-select form-select-sm">
+        <option value="">— Not selected —</option>
+        {% for key, label in column_choices.items %}
+        <option value="{{ key }}" {% if project.batches_status_column_key == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small fw-semibold mb-1">Value = "Keyed" <span class="text-muted fw-normal">(if no End Date)</span></label>
+      <select name="batches_keyed_value" class="form-select form-select-sm">
+        <option value="">— Not selected —</option>
+        {% for v in batches_status_values %}
+        <option value="{{ v }}" {% if project.batches_keyed_value == v %}selected{% endif %}>{{ v }}</option>
+        {% endfor %}
+      </select>
+      {% if project.batches_status_column_key and not batches_status_values %}
+      <div class="form-text small">Save the status column first — this list fills in next save.</div>
+      {% endif %}
+    </div>
+    <div class="col-md-4">
+      <label class="form-label small fw-semibold mb-1">End Date column <span class="text-muted fw-normal">(preferred)</span></label>
+      <select name="batches_end_date_column_key" class="form-select form-select-sm">
+        <option value="">— Not selected —</option>
+        {% for key, label in column_choices.items %}
+        <option value="{{ key }}" {% if project.batches_end_date_column_key == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <button class="btn btn-sm btn-primary w-100">Save</button>
+    </div>
+  </form>
+  <div class="row text-center mt-3">
+    <div class="col-4"><div class="fw-bold fs-6" style="color: var(--sp-navy)">{{ batches_keying.total_batches }}</div><div class="small text-muted">No. of Batches</div></div>
+    <div class="col-4"><div class="fw-bold fs-6" style="color: var(--sp-green)">{{ batches_keying.batches_keyed }}</div><div class="small text-muted">{% if batches_keying.configured %}Batches Keyed{% else %}Batches Shipped{% endif %}</div></div>
+    <div class="col-4"><div class="fw-bold fs-6" style="color: var(--sp-blue)">{{ batches_keying.batches_being_keyed }}</div><div class="small text-muted">No. of Batches Being Processed</div></div>
+  </div>
+</div>
+{% endif %} -->
+
+<div class="row g-3">
+  <div class="sp-panel">
+    <h6>Core Schema</h6>
+    <table class="table table-sm">
+      <tbody>
+        <tr>
+          <th style="width:220px">Project Name</th>
+          <td>{{ project.project_name }}</td>
+        </tr>
+        <tr>
+          <th>Branch</th>
+          <td>{{ project.branch.name }} ({{ project.branch.code }})</td>
+        </tr>
+        <tr>
+          <th>Start / End Date</th>
+          <td>{{ project.start_date }} &ndash; {{ project.end_date }}</td>
+        </tr>
+        <tr>
+          <th>Target Records</th>
+          <td>{{ project.target_records }}</td>
+        </tr>
+        <tr>
+          <th>Delivered Records</th>
+          <td>{{ project.delivered_records }}</td>
+        </tr>
+        <tr>
+          <th>Total Images</th>
+          <td>{{ project.total_images }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col-md-6">
+    <div class="sp-panel">
+      <h6>Project Status</h6>
+      {% if project_status.from_excel_formulas %}
+      <p class="small text-muted mb-2"><i class="bi bi-file-earmark-excel"></i> Straight from the Project Summary
+        sheet's own formulas.</p>
+      {% elif not project_status.column_selected %}
+      <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
+        readable — showing the imported Delivered Records total until you pick an Inventory column above.</p>
+      {% else %}
+      <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
+        readable — showing your selected Inventory column's sum instead.</p>
+      {% endif %}
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr>
+            <th>Delivered Records</th>
+            <td>{{ project_status.delivered_records }}</td>
+          </tr>
+          <tr>
+            <th>Delivered Records %</th>
+            <td>{{ project_status.delivered_records_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Days Gone</th>
+            <td>{{ project_status.days_gone }}</td>
+          </tr>
+          <tr>
+            <th>Days Gone %</th>
+            <td>{{ project_status.days_gone_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Remaining Records</th>
+            <td>{{ project_status.remaining_records }}</td>
+          </tr>
+          <tr>
+            <th>Remaining Records %</th>
+            <td>{{ project_status.remaining_records_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Remaining Days</th>
+            <td>{{ project_status.remaining_days }}</td>
+          </tr>
+          <tr>
+            <th>Remaining Days %</th>
+            <td>{{ project_status.remaining_days_pct }}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-md-6">
+    <div class="sp-panel">
+      <h6>Branch Status</h6>
+      {% if branch_status.from_excel_formulas %}
+      <p class="small text-muted mb-2"><i class="bi bi-file-earmark-excel"></i> Straight from the Project Summary
+        sheet's own formulas.</p>
+      {% elif not branch_status.column_selected %}
+      <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
+        readable, and no Inventory column selected yet — select a Received Records column above (e.g. "Ven's Rec").</p>
+      {% else %}
+      <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
+        readable — showing your selected Inventory column's sum instead.</p>
+      {% endif %}
+      <table class="table table-sm mb-0">
+        <tbody>
+          <tr>
+            <th>Received Records</th>
+            <td>{{ branch_status.received_records }}</td>
+          </tr>
+          <tr>
+            <th>Received Records %</th>
+            <td>{{ branch_status.received_records_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Days Gone %</th>
+            <td>{{ branch_status.days_gone_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Remaining Records</th>
+            <td>{{ branch_status.remaining_records }}</td>
+          </tr>
+          <tr>
+            <th>Remaining Records %</th>
+            <td>{{ branch_status.remaining_records_pct }}%</td>
+          </tr>
+          <tr>
+            <th>Remaining Days %</th>
+            <td>{{ branch_status.remaining_days_pct }}%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+{% endblock %}

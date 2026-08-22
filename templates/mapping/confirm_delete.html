@@ -1,0 +1,13 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">Delete Template</h4>
+<div class="sp-panel" style="max-width: 480px">
+  <p>Are you sure you want to delete <strong>{{ template.project_key }}</strong>? Existing projects imported with it
+  keep their data - this only removes the template itself from the Upload Excel dropdown.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn btn-danger">Delete</button>
+    <a href="{% url 'mapping:list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

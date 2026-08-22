@@ -1,0 +1,106 @@
+{% extends "base/base.html" %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-start">
+  <div>
+    <h4 class="fw-bold mb-1" style="color: var(--sp-navy)">{{ project.project_name }}</h4>
+    <p class="text-muted">{{ project.branch.name }} ({{ project.branch.code }}) &middot; {{ project.start_date }} – {{ project.end_date }}</p>
+  </div>
+  <div>
+    <a href="{% url 'inventory:detail' project.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-boxes"></i> Inventory Tracker</a>
+    <a href="{% url 'projects:insights' project.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-info-circle"></i> Project Insights</a>
+    {% if project.google_sheet_url and user.profile.can_edit_projects %}
+    <form method="post" action="{% url 'projects:sync_now' project.pk %}" class="d-inline" onsubmit="return spSyncSubmit(this)">
+      {% csrf_token %}
+      <button class="btn btn-sm btn-outline-success" id="syncNowBtn"><i class="bi bi-arrow-repeat"></i> Sync Now</button>
+    </form>
+    {% endif %}
+    {% if user.profile.can_edit_projects %}
+    <a href="{% url 'projects:edit' project.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i> Edit</a>
+    {% endif %}
+    {% if user.profile.can_delete_projects %}
+    <a href="{% url 'projects:delete' project.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i> Delete</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-3 mt-1">
+  <div class="col-md-3"><div class="kpi-card kpi-navy"><div class="kpi-label">Target</div><div class="kpi-value">{{ project.target_records }}</div></div></div>
+  <div class="col-md-3"><div class="kpi-card kpi-green"><div class="kpi-label">Delivered</div><div class="kpi-value">{{ project.delivered_records }}</div></div></div>
+  <div class="col-md-3"><div class="kpi-card kpi-yellow"><div class="kpi-label">Remaining</div><div class="kpi-value">{{ project.remaining_records }}</div></div></div>
+  <div class="col-md-3"><div class="kpi-card kpi-teal"><div class="kpi-label">Delivery %</div><div class="kpi-value">{{ project.delivery_percent }}%</div></div></div>
+</div>
+
+<div class="sp-panel">
+  <h6>Production Batches</h6>
+  <!-- <p class="small text-muted mb-2">No. of Batches − No. of Batches Shipped = No. of Batches Being Processed</p> -->
+  <div class="row g-3 text-center">
+    <div class="col-6 col-md-3"><div class="fw-bold fs-5" style="color: var(--sp-navy)">{{ batches_keying.total_batches }}</div><div class="small text-muted">No. of Batches</div></div>
+    <div class="col-6 col-md-3"><div class="fw-bold fs-5" style="color: var(--sp-orange)">{{ project.promoted }}</div><div class="small text-muted">No. of Batches Shipped</div></div>
+    <div class="col-6 col-md-3"><div class="fw-bold fs-5" style="color: var(--sp-blue)">{{ batches_keying.batches_being_keyed }}</div><div class="small text-muted">No. of Batches Being Processed</div></div>
+    <div class="col-6 col-md-3"><div class="fw-bold fs-5" style="color: var(--sp-green)">{{ project.promoted_percent }}%</div><div class="small text-muted">Batches Shipped %</div></div>
+  </div>
+  {% if not batches_keying.configured %}
+  <!-- <p class="small text-muted mb-0 mt-2"><i class="bi bi-info-circle"></i> No. of Batches Being Processed = No. of Batches
+    − No. of Batches Shipped (rows with a Shipment Date filled in). Want to exclude WIP/blank rows from the count
+    too? <a href="{% url 'projects:insights' project.pk %}">Configure a status column</a> on Project Insights for
+    that refinement.</p> -->
+  {% endif %}
+</div>
+
+<div class="sp-panel">
+  <h6>Timeline Progress (working days, Sundays excluded)</h6>
+  <div class="row text-center mb-2">
+    <div class="col"><div class="fw-bold">{{ project.working_days_total }}</div><div class="small text-muted">Working Days</div></div>
+    <div class="col"><div class="fw-bold">{{ project.working_days_completed }}</div><div class="small text-muted">Days Completed</div></div>
+    <div class="col"><div class="fw-bold">{{ project.working_days_remaining }}</div><div class="small text-muted">Days Remaining</div></div>
+    <div class="col"><div class="fw-bold">{{ project.timeline_percent }}%</div><div class="small text-muted">Timeline %</div></div>
+  </div>
+  <div class="progress"><div class="progress-bar progress-bar-navy" style="width: {{ project.timeline_percent }}%"></div></div>
+</div>
+
+<div class="sp-panel">
+  <h6>Milestones</h6>
+  <div class="milestone-track">
+    <div class="milestone-fill" style="width: {{ project.timeline_percent }}%"></div>
+    {% for m in milestones %}
+      <div class="milestone-point status-{{ m.status }}" style="left: calc({{ m.expected_pct }}% - 8px);"></div>
+    {% endfor %}
+  </div>
+  <div class="d-flex justify-content-between">
+    {% for m in milestones %}
+      <div class="text-center flex-fill">
+        <span class="status-dot status-{{ m.status }}"></span>
+        <div class="fw-semibold small mt-1">{{ m.label }}</div>
+        <div class="text-muted small">{{ m.date }}</div>
+        <div class="text-muted small">Pct by {{ m.label }}: {{ m.actual_pct }}%</div>
+        <div class="text-muted small">{{ m.status_label }}</div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% comment %}
+  Live Google Sheet Sync panel and Import History table hidden from the UI
+  per request - the "Sync Now" button above still works exactly the same,
+  this just removes the extra explanatory panel + audit table from view.
+{% endcomment %}
+
+<div id="syncOverlay" class="sp-import-overlay d-none">
+  <div class="sp-import-card">
+    <div class="sp-spinner" aria-hidden="true"></div>
+    <div class="fw-semibold mt-3">Syncing from Google Sheet…</div>
+    <div class="text-muted small mt-1">Downloading the current sheet and re-importing. Please keep this tab open.</div>
+  </div>
+</div>
+
+<script>
+function spSyncSubmit(form) {
+  const btn = document.getElementById('syncNowBtn');
+  if (btn.disabled) return false;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Syncing…';
+  document.getElementById('syncOverlay').classList.remove('d-none');
+  return true;
+}
+</script>
+{% endblock %}

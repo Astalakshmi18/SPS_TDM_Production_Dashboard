@@ -1,0 +1,15 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-1" style="color: var(--sp-navy)">{{ template.project_key }}</h4>
+<p class="text-muted">{{ template.display_name }} &middot; Branch: {{ template.branch.code }}</p>
+
+<div class="sp-panel">
+  <h6>Mapping Config</h6>
+  <p class="small text-muted">This is exactly what the import engine reads to pull each standard-schema field out of
+  a "{{ template.project_key }}"-format Excel file. Edit the matching file in <code>/mappings/{{ template.project_key|lower }}_mapping.json</code>
+  and click "Sync from /mappings folder" on the list page to apply changes — no code change required.</p>
+  <pre class="bg-light p-3 rounded small">{{ config_pretty }}</pre>
+</div>
+
+<a href="{% url 'mapping:list' %}" class="btn btn-sm btn-outline-secondary">&larr; Back to Templates</a>
+{% endblock %}

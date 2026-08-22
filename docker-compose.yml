@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: swiftprosys_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=prod-secret-key-swiftprosys-demo-2026
+      - ALLOWED_HOSTS=*
+    volumes:
+      - app_data:/app/data
+      - media_data:/app/media
+
+volumes:
+  app_data:
+  media_data:

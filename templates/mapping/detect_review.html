@@ -1,0 +1,74 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-1" style="color: var(--sp-navy)"><i class="bi bi-magic"></i> Review Detected Mapping</h4>
+<p class="text-muted small mb-3">
+  Confidence:
+  {% if confidence == "high" %}<span class="badge bg-success">High</span>
+  {% elif confidence == "medium" %}<span class="badge bg-warning text-dark">Medium</span>
+  {% else %}<span class="badge bg-danger">Low — please review carefully</span>{% endif %}
+</p>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="sp-panel">
+      <h6>Detection Notes</h6>
+      <ul class="small mb-0">
+        {% for note in notes %}<li>{{ note }}</li>{% endfor %}
+      </ul>
+    </div>
+
+    <div class="sp-panel">
+      <h6>Preview: Extracted Values from Your Sample File</h6>
+      {% if preview_valid %}
+        <span class="badge bg-success mb-2">Valid — extraction succeeded</span>
+        <div class="table-responsive">
+        <table class="table table-sm">
+          <tbody>
+            {% for key, value in preview_values.items %}
+            <tr><th style="width:140px">{{ key }}</th><td>{{ value }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        </div>
+      {% else %}
+        <span class="badge bg-danger mb-2">Not valid yet</span>
+        <ul class="small text-danger">
+          {% for err in preview_errors %}<li>{{ err }}</li>{% endfor %}
+        </ul>
+        <p class="small text-muted mb-0">Edit the config on the right to fix these, or save anyway and fix it later from Template Mapping.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="sp-panel">
+      <h6>Save as Reusable Template</h6>
+      <form method="post" action="{% url 'mapping:auto_detect_save' %}">
+        {% csrf_token %}
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small">Project Key</label>
+            <input name="project_key" class="form-control form-control-sm" placeholder="e.g. SSH" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small">Display Name</label>
+            <input name="display_name" class="form-control form-control-sm" placeholder="e.g. SSH Project">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Branch</label>
+          <select name="branch" class="form-select form-select-sm">
+            {% for b in branches %}<option value="{{ b.code }}">{{ b.code }} - {{ b.name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small">Mapping Config (edit if needed)</label>
+          <textarea name="config" class="form-control" rows="16" style="font-family: monospace; font-size: .82rem;">{{ config_text }}</textarea>
+        </div>
+        <button class="btn text-white w-100" style="background: var(--sp-navy)"><i class="bi bi-save"></i> Save &amp; Reuse This Template</button>
+      </form>
+      <p class="small text-muted mt-2 mb-0">Once saved, this template appears in the Upload Excel dropdown for every future file of this format — no need to detect again.</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

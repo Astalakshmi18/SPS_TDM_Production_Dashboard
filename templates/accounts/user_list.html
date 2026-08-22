@@ -1,0 +1,72 @@
+{% extends "base/base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <h4 class="fw-bold mb-0" style="color: var(--sp-navy)"><i class="bi bi-people-fill me-2"></i>User Management</h4>
+  </div>
+  <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap ms-auto">
+    <i class="bi bi-person-plus-fill me-1"></i> New User
+  </a>
+</div>
+
+<div class="sp-panel">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle sp-inventory-table">
+      <thead>
+        <tr>
+          <th>User</th>
+          <th>Role</th>
+          <th>Branch Access</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="sp-user-avatar" style="width: 32px; height: 32px; font-size: 0.85rem;" title="{{ u.username }}">{{ u.username|slice:":1"|upper }}</div>
+              <span class="fw-bold text-navy">{{ u.username }}</span>
+            </div>
+          </td>
+          <td>
+            {% if u.profile.role == 'ADMIN' %}
+              <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle"><i class="bi bi-shield-lock me-1"></i> Administrator</span>
+            {% elif u.profile.role == 'MANAGER' %}
+              <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle"><i class="bi bi-briefcase me-1"></i> Branch Manager</span>
+            {% elif u.profile.role == 'PM' %}
+              <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle"><i class="bi bi-kanban me-1"></i> Project Manager</span>
+            {% elif u.profile.role == 'PL' %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle"><i class="bi bi-person-badge me-1"></i> Project Lead</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle"><i class="bi bi-eye me-1"></i> Viewer</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.profile.is_admin %}
+              <span class="badge bg-dark text-white"><i class="bi bi-globe me-1"></i> All Branches</span>
+            {% else %}
+              {% for b in u.profile.branches.all %}
+                <span class="badge bg-light text-dark border me-1">{{ b.code }}</span>
+              {% empty %}
+                <span class="text-muted small">None assigned</span>
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a href="{% url 'accounts:user_edit' u.pk %}" class="btn btn-outline-secondary py-0 px-2" title="Edit User"><i class="bi bi-pencil small"></i></a>
+              {% if u != request.user %}
+              <a href="{% url 'accounts:user_delete' u.pk %}" class="btn btn-outline-danger py-0 px-2" title="Delete User"><i class="bi bi-trash small"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted text-center py-4">No users found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

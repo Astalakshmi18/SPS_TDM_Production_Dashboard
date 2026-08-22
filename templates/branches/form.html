@@ -1,0 +1,25 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">{% if mode == "edit" %}Edit Branch{% else %}New Branch{% endif %}</h4>
+<div class="sp-panel" style="max-width: 420px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label">Code</label>
+      <input name="code" class="form-control" value="{{ branch.code|default:'' }}" maxlength="10" required {% if mode == "edit" %}{% endif %}>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Name</label>
+      <input name="name" class="form-control" value="{{ branch.name|default:'' }}" required>
+    </div>
+    {% if mode == "edit" %}
+    <div class="form-check mb-3">
+      <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if branch.is_active %}checked{% endif %}>
+      <label class="form-check-label" for="isActive">Active</label>
+    </div>
+    {% endif %}
+    <button class="btn text-white" style="background: var(--sp-navy)">{% if mode == "edit" %}Save Changes{% else %}Create Branch{% endif %}</button>
+    <a href="{% url 'branches:list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

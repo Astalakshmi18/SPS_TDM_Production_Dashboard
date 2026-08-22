@@ -1,0 +1,57 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">{% if mode == "edit" %}Edit User — {{ target.username }}{% else %}New User{% endif %}</h4>
+<div class="sp-panel" style="max-width: 480px">
+  <form method="post">
+    {% csrf_token %}
+    {% if mode != "edit" %}
+    <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" required></div>
+    {% endif %}
+    <div class="mb-3">
+      <label class="form-label">{% if mode == "edit" %}New Password (leave blank to keep current){% else %}Password{% endif %}</label>
+      <input type="password" name="password" class="form-control" {% if mode != "edit" %}required{% endif %}>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Role</label>
+      <select name="role" class="form-select">
+        {% for value, label in role_choices %}
+          <option value="{{ value }}" {% if target.profile.role == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Branch Access</label>
+      <div class="form-text mb-2">Administrators always have full access to every branch regardless of what's
+        checked here. For Branch Manager / Viewer, check every branch this person should be able to see and act on —
+        leave all unchecked to grant no access yet.</div>
+      {% for b in branches %}
+      <div class="form-check">
+        <input type="checkbox" name="branches" value="{{ b.pk }}" class="form-check-input" id="branch{{ b.pk }}"
+               {% if b.pk in assigned_branch_ids %}checked{% endif %}>
+        <label class="form-check-label" for="branch{{ b.pk }}">{{ b.code }} - {{ b.name }}</label>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mb-3">
+      <label class="form-label">Project Access <span class="text-muted fw-normal">(Project Manager &amp; Viewer only)</span></label>
+      <div class="form-text mb-2">Only enforced for the <strong>Project Manager</strong> and <strong>Viewer</strong> roles - they'll
+        see/act on exactly the projects checked here (still limited to their checked branches above). Ignored for
+        Administrator / Branch Manager / Project Lead, who go by Branch Access alone. Leave unchecked for a new
+        Project Manager/Viewer to grant no project access yet.</div>
+      <div class="sp-checklist-scroll">
+        {% for p in projects %}
+        <div class="form-check">
+          <input type="checkbox" name="projects" value="{{ p.pk }}" class="form-check-input" id="project{{ p.pk }}"
+                 {% if p.pk in assigned_project_ids %}checked{% endif %}>
+          <label class="form-check-label" for="project{{ p.pk }}">{{ p.branch.code }} — {{ p.project_name }}</label>
+        </div>
+        {% empty %}
+        <div class="text-muted small">No projects exist yet.</div>
+        {% endfor %}
+      </div>
+    </div>
+    <button class="btn text-white" style="background: var(--sp-navy)">{% if mode == "edit" %}Save Changes{% else %}Create User{% endif %}</button>
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

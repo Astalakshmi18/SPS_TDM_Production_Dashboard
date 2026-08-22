@@ -1,0 +1,10 @@
+Django
+djangorestframework
+pandas
+openpyxl
+django-widget-tweaks
+python-decouple
+requests
+google-genai
+gunicorn
+whitenoise

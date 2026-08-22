@@ -1,0 +1,124 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">Upload Project Data</h4>
+
+<div class="row">
+  <div class="col-lg-6">
+    <div class="sp-panel">
+      <form method="post" enctype="multipart/form-data" id="importForm">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label">1. Select Project Template</label>
+          <select name="template" class="form-select" required>
+            <option value="">— choose —</option>
+            {% for t in templates %}
+              <option value="{{ t.pk }}">{{ t.project_key }} — {{ t.display_name }} ({{ t.branch.code }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">No template for this project yet? <a href="{% url 'mapping:list' %}">Create one in Template Mapping</a>.</div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">2. Source</label>
+          <div class="btn-group w-100" role="group">
+            <input type="radio" class="btn-check" name="source" id="srcFile" value="file" checked onchange="toggleSource()">
+            <label class="btn btn-outline-secondary" for="srcFile"><i class="bi bi-file-earmark-excel"></i> Excel File</label>
+            <input type="radio" class="btn-check" name="source" id="srcSheet" value="gsheet" onchange="toggleSource()">
+            <label class="btn btn-outline-secondary" for="srcSheet"><i class="bi bi-google"></i> Google Sheet Link</label>
+          </div>
+        </div>
+
+        <div class="mb-3" id="fileField">
+          <label class="form-label">Choose Excel File</label>
+          <input type="file" name="excel_file" class="form-control" accept=".xlsx,.xls">
+        </div>
+
+        <div class="mb-3 d-none" id="sheetField">
+          <label class="form-label">Google Sheet Link</label>
+          <input type="url" name="sheet_url" class="form-control" placeholder="https://docs.google.com/spreadsheets/d/....">
+          <div class="form-text">Sheet must be shared as "Anyone with the link can view".</div>
+        </div>
+
+        <div class="alert alert-light border small text-muted mb-3">
+          <i class="bi bi-info-circle"></i> Large files (tens of thousands of inventory rows) can take up to a
+          minute or two to fully import. The page will stay on this screen and show a spinner the whole time —
+          that's normal, not a freeze. Please don't close the tab or click Import twice.
+        </div>
+
+        <button type="submit" class="btn text-white" id="importBtn" style="background: var(--sp-navy)">
+          <span id="importBtnIcon"><i class="bi bi-upload"></i></span>
+          <span id="importBtnText">Import &amp; Refresh Dashboard</span>
+        </button>
+      </form>
+    </div>
+  </div>
+  <div class="col-lg-6">
+    <div class="sp-panel">
+      <h6>Recent Imports</h6>
+      <div class="table-responsive">
+      <table class="table table-sm">
+        <thead><tr><th>Source</th><th>File / Link</th><th>Status</th><th>When</th></tr></thead>
+        <tbody>
+        {% for b in recent_batches %}
+          <tr>
+            <td>{% if b.source_type == "GOOGLE_SHEET" %}<i class="bi bi-google"></i> Sheet{% else %}<i class="bi bi-file-earmark-excel"></i> File{% endif %}</td>
+            <td class="small">{{ b.file_name|truncatechars:40 }}</td>
+            <td>{% if b.status == "SUCCESS" %}<span class="badge bg-success">Success</span>{% else %}<span class="badge bg-danger">Failed</span>{% endif %}</td>
+            <td class="small text-muted">{{ b.created_at }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="4" class="text-muted">No imports yet.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Full-screen overlay so the page never feels frozen during a slow import -->
+<div id="importOverlay" class="sp-import-overlay d-none">
+  <div class="sp-import-card">
+    <div class="sp-spinner" aria-hidden="true"></div>
+    <div class="fw-semibold mt-3" id="overlayStage">Uploading file…</div>
+    <div class="text-muted small mt-1">This can take a minute or two for large files. Please keep this tab open.</div>
+  </div>
+</div>
+
+<script>
+function toggleSource() {
+  const isSheet = document.getElementById('srcSheet').checked;
+  document.getElementById('fileField').classList.toggle('d-none', isSheet);
+  document.getElementById('sheetField').classList.toggle('d-none', !isSheet);
+  document.querySelector('[name=excel_file]').required = !isSheet;
+  document.querySelector('[name=sheet_url]').required = isSheet;
+}
+
+document.getElementById('importForm').addEventListener('submit', function (e) {
+  const btn = document.getElementById('importBtn');
+  if (btn.disabled) {
+    e.preventDefault(); // guard against double-submit / double-click
+    return;
+  }
+  btn.disabled = true;
+  document.getElementById('importBtnIcon').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  document.getElementById('importBtnText').textContent = 'Importing…';
+
+  const overlay = document.getElementById('importOverlay');
+  overlay.classList.remove('d-none');
+
+  const isSheet = document.getElementById('srcSheet').checked;
+  const stages = isSheet
+    ? ['Downloading Google Sheet…', 'Reading the workbook…', 'Mapping fields…', 'Saving to the dashboard…']
+    : ['Uploading file…', 'Reading the workbook…', 'Mapping fields…', 'Saving to the dashboard…'];
+  let i = 0;
+  const stageEl = document.getElementById('overlayStage');
+  setInterval(function () {
+    i = Math.min(i + 1, stages.length - 1);
+    stageEl.textContent = stages[i];
+  }, 4000);
+  // form submits normally after this - the overlay stays up until the
+  // server responds and the browser navigates to the next page.
+});
+</script>
+{% endblock %}

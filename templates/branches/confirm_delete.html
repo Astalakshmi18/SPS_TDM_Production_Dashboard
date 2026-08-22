@@ -1,0 +1,12 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">Delete Branch</h4>
+<div class="sp-panel" style="max-width: 420px">
+  <p>Are you sure you want to delete <strong>{{ branch.code }} - {{ branch.name }}</strong>? This cannot be undone.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button class="btn btn-danger">Delete</button>
+    <a href="{% url 'branches:list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

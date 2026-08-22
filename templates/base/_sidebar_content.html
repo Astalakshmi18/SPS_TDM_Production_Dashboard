@@ -1,0 +1,119 @@
+{% load static %}
+<div class="sp-brand justify-content-between w-100">
+  <span class="sp-logo-chip">
+    <img src="{% static 'img/logo.png' %}" alt="Swift Prosys" class="sp-logo-img sp-logo-full">
+    <img src="{% static 'img/logo_min.png' %}" alt="Swift Prosys" class="sp-logo-img sp-logo-min">
+  </span>
+  <button type="button" class="btn btn-sm text-light p-1 sp-toggle-btn d-none d-lg-inline-flex" onclick="spToggleSidebar(event)" title="Toggle Sidebar" aria-label="Toggle Sidebar">
+    <i class="bi bi-chevron-left"></i>
+  </button>
+</div>
+<ul class="nav flex-column mt-3">
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.view_name == 'dashboard:home' %}active{% endif %}" href="{% url 'dashboard:home' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Production Dashboard">
+      <i class="bi bi-speedometer2"></i>
+      <span class="sp-nav-text">Production Dashboard</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.app_name == 'inventory' %}active{% endif %}" href="{% url 'inventory:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Inventory Tracker">
+      <i class="bi bi-boxes"></i>
+      <span class="sp-nav-text">Inventory Tracker</span>
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'projects' %}active{% endif %}" href="{% url 'projects:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Projects">
+      <i class="bi bi-kanban"></i>
+      <span class="sp-nav-text">Projects</span>
+    </a>
+  </li>
+  {% if user.profile.can_create_projects %}
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'upload' %}active{% endif %}" href="{% url 'projects:upload' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Import Data">
+      <i class="bi bi-upload"></i>
+      <span class="sp-nav-text">Import Data</span>
+    </a>
+  </li>
+  {% endif %}
+  {% if user.profile.can_manage_templates %}
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.app_name == 'mapping' %}active{% endif %}" href="{% url 'mapping:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Template Mapping">
+      <i class="bi bi-diagram-3"></i>
+      <span class="sp-nav-text">Template Mapping</span>
+    </a>
+  </li>
+  {% endif %}
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.app_name == 'branches' %}active{% endif %}" href="{% url 'branches:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Branches">
+      <i class="bi bi-diagram-2"></i>
+      <span class="sp-nav-text">Branches</span>
+    </a>
+  </li>
+  {% if user.profile.is_admin %}
+  <li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'accounts:user_list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Users">
+      <i class="bi bi-people"></i>
+      <span class="sp-nav-text">Users</span>
+    </a>
+  </li>
+  {% endif %}
+</ul>
+<div class="sp-user">
+  <div class="d-flex align-items-center gap-2 sp-user-wrapper">
+    <div class="sp-user-avatar" title="{{ user.username }} ({{ user.profile.role }})">{{ user.username|slice:":1"|upper }}</div>
+    <div class="sp-user-info">
+      <div class="fw-semibold text-capitalize">{{ user.username }}</div>
+      <div class="small text-uppercase sp-role-badge">{{ user.profile.role }}</div>
+    </div>
+  </div>
+  <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-outline-light mt-2 w-100 sp-logout-btn" title="Logout">
+    <i class="bi bi-box-arrow-right"></i>
+    <span class="sp-logout-text"> Logout</span>
+  </a>
+</div>
+
+<script>
+window.spToggleSidebar = function(e) {
+  if (e) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+  }
+  var sidebar = document.querySelector('.sp-sidebar');
+  if (!sidebar) return;
+  
+  var collapsed = sidebar.classList.toggle('sp-sidebar-collapsed');
+  try {
+    localStorage.setItem('spSidebarCollapsed', collapsed ? 'true' : 'false');
+  } catch (err) {}
+  
+  var btns = document.querySelectorAll('.sp-toggle-btn i');
+  btns.forEach(function(icon) {
+    if (collapsed) {
+      icon.className = 'bi bi-chevron-right';
+    } else {
+      icon.className = 'bi bi-chevron-left';
+    }
+  });
+};
+
+(function() {
+  try {
+    var isCollapsed = localStorage.getItem('spSidebarCollapsed') === 'true';
+    if (isCollapsed) {
+      var applyState = function() {
+        var sidebar = document.querySelector('.sp-sidebar');
+        if (sidebar) {
+          sidebar.classList.add('sp-sidebar-collapsed');
+          var btns = document.querySelectorAll('.sp-toggle-btn i');
+          btns.forEach(function(icon) { icon.className = 'bi bi-chevron-right'; });
+        }
+      };
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', applyState);
+      } else {
+        applyState();
+      }
+    }
+  } catch (err) {}
+})();
+</script>

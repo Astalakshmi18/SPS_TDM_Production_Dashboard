@@ -1,0 +1,87 @@
+{
+  "project_key": "NEWSPAPER",
+  "display_name": "Newspaper",
+  "branch": "TDM",
+  "config": {
+    "project_name": {
+      "mode": "cell",
+      "sheet": "Version Control",
+      "cell": "B1"
+    },
+    "branch": {
+      "mode": "static",
+      "value": "TDM"
+    },
+    "start_date": {
+      "mode": "cell",
+      "sheet": "Project Summary",
+      "cell": "D1"
+    },
+    "end_date": {
+      "mode": "cell",
+      "sheet": "Project Summary",
+      "cell": "F1"
+    },
+    "target": {
+      "mode": "cell",
+      "sheet": "Project Summary",
+      "cell": "B2"
+    },
+    "delivered": {
+      "mode": "cell",
+      "sheet": "Project Summary",
+      "cell": "B4"
+    },
+    "images": {
+      "mode": "sum_column",
+      "sheet": "Inventory",
+      "column": "# Images"
+    },
+    "extra_fields": {
+      "Volume Unit": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "C2"
+      },
+      "Days Gone": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "C4"
+      },
+      "Delivered % (as reported)": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "B5"
+      },
+      "Days Gone %": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "B6"
+      },
+      "Remaining Pages (as reported)": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "B8"
+      },
+      "Remaining Days (as reported)": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "C8"
+      },
+      "Total Duration (Days)": {
+        "mode": "cell",
+        "sheet": "Project Summary",
+        "cell": "H1"
+      }
+    },
+    "inventory_rows": {
+      "sheet": "Inventory",
+      "columns": {
+        "file_name": "Folder Name",
+        "image_count": "# Images",
+        "record_count": "Accepted Images",
+        "shipment_date": "Shipment"
+      }
+    }
+  }
+}

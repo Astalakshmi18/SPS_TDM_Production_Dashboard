@@ -1,0 +1,42 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">{% if mode == "edit" %}Edit Template — {{ template.project_key }}{% else %}New Template{% endif %}</h4>
+<div class="sp-panel">
+  <form method="post">
+    {% csrf_token %}
+    <div class="row g-3 mb-3">
+      {% if mode != "edit" %}
+      <div class="col-md-4">
+        <label class="form-label">Project Key</label>
+        <input name="project_key" class="form-control" value="{{ project_key|default:'' }}" placeholder="e.g. SSH" required>
+      </div>
+      {% endif %}
+      <div class="col-md-4">
+        <label class="form-label">Display Name</label>
+        <input name="display_name" class="form-control" value="{{ display_name|default:template.display_name|default:'' }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Branch</label>
+        <select name="branch" class="form-select">
+          {% for b in branches %}
+            <option value="{{ b.code }}" {% if template.branch.code == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+    {% if mode == "edit" %}
+    <div class="form-check mb-3">
+      <input type="checkbox" name="is_active" class="form-check-input" id="isActive" {% if template.is_active %}checked{% endif %}>
+      <label class="form-check-label" for="isActive">Active</label>
+    </div>
+    {% endif %}
+    <div class="mb-3">
+      <label class="form-label">Mapping Config (JSON)</label>
+      <textarea name="config" class="form-control" rows="16" style="font-family: monospace; font-size: .85rem;" required>{{ config_text|default:"{}" }}</textarea>
+      <div class="form-text">See <code>mappings/*.json</code> in the project root for examples of <code>cell</code>, <code>sum_column</code>, <code>header</code>, and <code>extra_fields</code>/<code>inventory_rows</code> rule shapes.</div>
+    </div>
+    <button class="btn text-white" style="background: var(--sp-navy)">{% if mode == "edit" %}Save Changes{% else %}Create Template{% endif %}</button>
+    <a href="{% url 'mapping:list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)"><i class="bi bi-magic"></i> Auto-Detect Template Mapping</h4>
+<div class="sp-panel" style="max-width: 560px">
+  <p class="text-muted small">Upload a sample Excel file for a project format that doesn't have a template yet.
+  If it matches the standard "Project Summary" / "Version Control" company layout, detection will be high-confidence.
+  Otherwise it tries AI-assisted detection (if configured), then falls back to scanning column headers — either way,
+  you'll review the result and see it validated against your real file before anything is saved.</p>
+  <form method="post" enctype="multipart/form-data" id="detectForm">
+    {% csrf_token %}
+    <div class="mb-3">
+      <label class="form-label">Sample Excel File</label>
+      <input type="file" name="sample_file" class="form-control" accept=".xlsx,.xls" required>
+    </div>
+    <button type="submit" class="btn text-white" id="detectBtn" style="background: var(--sp-navy)">
+      <span id="detectBtnIcon"><i class="bi bi-search"></i></span> <span id="detectBtnText">Detect Mapping</span>
+    </button>
+    <a href="{% url 'mapping:list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+
+<div id="detectOverlay" class="sp-import-overlay d-none">
+  <div class="sp-import-card">
+    <div class="sp-spinner" aria-hidden="true"></div>
+    <div class="fw-semibold mt-3">Analyzing your file…</div>
+    <div class="text-muted small mt-1">Checking layout, then validating against real values. A few seconds for most files.</div>
+  </div>
+</div>
+
+<script>
+document.getElementById('detectForm').addEventListener('submit', function (e) {
+  const btn = document.getElementById('detectBtn');
+  if (btn.disabled) { e.preventDefault(); return; }
+  btn.disabled = true;
+  document.getElementById('detectBtnIcon').innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  document.getElementById('detectBtnText').textContent = 'Detecting…';
+  document.getElementById('detectOverlay').classList.remove('d-none');
+});
+</script>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base/base.html" %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+  <h4 class="fw-bold mb-0 text-nowrap" style="color: var(--sp-navy)"><i class="bi bi-kanban-fill me-2"></i>Projects</h4>
+  <div class="d-flex align-items-center justify-content-end gap-2 ms-auto">
+    {% if user.profile.can_edit_projects %}
+    <form method="post" action="{% url 'projects:sync_all' %}" class="d-inline mb-0">
+      {% csrf_token %}
+      <button class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-arrow-repeat me-1"></i> Sync All</button>
+    </form>
+    {% endif %}
+    {% if user.profile.can_create_projects %}
+    <a href="{% url 'projects:create' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-plus-lg me-1"></i> New Project</a>
+    <a href="{% url 'projects:upload' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Import Data</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="sp-panel">
+  <form method="get" class="row g-2 align-items-center mb-3">
+    <div class="{% if show_branch_filter %}col-md-5{% else %}col-md-9{% endif %}">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
+        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search project name...">
+      </div>
+    </div>
+    {% if show_branch_filter %}
+    <div class="col-md-4">
+      <select name="branch" class="form-select form-select-sm">
+        <option value="">All Branches</option>
+        {% for code, name in branch_choices %}<option value="{{ code }}" {% if branch_code == code %}selected{% endif %}>{{ code }} — {{ name }}</option>{% endfor %}
+      </select>
+    </div>
+    {% endif %}
+    <div class="col-md-3 text-end">
+      <button class="btn btn-outline-primary btn-sm w-100 fw-semibold">Filter</button>
+    </div>
+  </form>
+
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle sp-inventory-table">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Branch</th>
+          <th>Target</th>
+          <th>Delivered</th>
+          <th>Delivery %</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in projects %}
+        <tr>
+          <td>
+            <a href="{% url 'projects:detail' p.pk %}" class="fw-bold text-decoration-none text-navy fs-6">{{ p.project_name }}</a>
+          </td>
+          <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ p.branch.code }}</span></td>
+          <td class="fw-semibold">{{ p.target_records|floatformat:0 }}</td>
+          <td class="fw-semibold text-success">{{ p.delivered_records|floatformat:0 }}</td>
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height: 6px; min-width: 60px;">
+                <div class="progress-bar bg-success" style="width: {{ p.delivery_percent }}%"></div>
+              </div>
+              <span class="fw-semibold small">{{ p.delivery_percent }}%</span>
+            </div>
+          </td>
+          <td>
+            <span class="status-dot status-{{ p.status }}"></span>
+            <span class="fw-semibold small text-capitalize">{{ p.status }}</span>
+          </td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a href="{% url 'projects:insights' p.pk %}" class="btn btn-outline-primary py-0 px-2" title="Project Insights"><i class="bi bi-graph-up-arrow small"></i></a>
+              {% if user.profile.can_edit_projects %}
+              <a href="{% url 'projects:edit' p.pk %}" class="btn btn-outline-secondary py-0 px-2" title="Edit Project"><i class="bi bi-pencil small"></i></a>
+              {% endif %}
+              {% if user.profile.can_delete_projects %}
+              <a href="{% url 'projects:delete' p.pk %}" class="btn btn-outline-danger py-0 px-2" title="Delete Project"><i class="bi bi-trash small"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted text-center py-4">No projects found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

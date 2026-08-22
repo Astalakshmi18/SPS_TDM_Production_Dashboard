@@ -1,0 +1,88 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">{% if mode == "edit" %}Edit Project{% else %}New Project{% endif %}</h4>
+<div class="sp-panel" style="max-width: 640px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label">Project Name</label>
+        <input name="project_name" class="form-control" value="{{ project.project_name|default:'' }}" required>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Project Key</label>
+        <input name="project_key" class="form-control" value="{{ project.project_key|default:'' }}" required
+               {% if mode == "edit" %}readonly{% endif %}>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Branch</label>
+        <select name="branch" class="form-select" required>
+          {% for b in branches %}
+            <option value="{{ b.pk }}" {% if project.branch_id == b.pk %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Start Date</label>
+        <input type="date" name="start_date" class="form-control" value="{{ project.start_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">End Date</label>
+        <input type="date" name="end_date" class="form-control" value="{{ project.end_date|date:'Y-m-d' }}" required>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Target Records</label>
+        <input type="number" name="target_records" class="form-control" value="{{ project.target_records|default:0 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Delivered Records</label>
+        <input type="number" name="delivered_records" class="form-control" value="{{ project.delivered_records|default:0 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Total Images</label>
+        <input type="number" name="total_images" class="form-control" value="{{ project.total_images|default:0 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Total Batches</label>
+        <input type="number" name="total_batches" class="form-control" value="{{ project.total_batches|default:0 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Batches Being Processed</label>
+        <input type="number" name="batches_being_keyed" class="form-control" value="{{ project.batches_being_keyed|default:0 }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Delivered Batches</label>
+        <input type="number" name="promoted" class="form-control" value="{{ project.promoted|default:0 }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Language</label>
+        <input name="language" class="form-control" value="{{ project.language|default:'' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Vendor</label>
+        <input name="vendor" class="form-control" value="{{ project.vendor|default:'' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Event Type</label>
+        <input name="event_type" class="form-control" value="{{ project.event_type|default:'' }}">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">OCR Status</label>
+        <input name="ocr_status" class="form-control" value="{{ project.ocr_status|default:'' }}">
+      </div>
+      <div class="col-md-12">
+        <label class="form-label">Linked Google Sheet (optional — enables live sync)</label>
+        <input type="url" name="google_sheet_url" class="form-control" value="{{ project.google_sheet_url|default:'' }}"
+               placeholder="https://docs.google.com/spreadsheets/d/....">
+        <div class="form-text">If set, "Sync Now" and the auto-sync webhook become available on the project's detail page.</div>
+      </div>
+    </div>
+    <button class="btn text-white mt-3" style="background: var(--sp-navy)">
+      {% if mode == "edit" %}Save Changes{% else %}Create Project{% endif %}
+    </button>
+    {% if mode == "edit" %}
+      <a href="{% url 'projects:detail' project.pk %}" class="btn btn-outline-secondary mt-3">Cancel</a>
+    {% endif %}
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+{% extends "base/base.html" %}
+{% block content %}
+<div class="sp-panel text-center" style="max-width: 520px; margin: 3rem auto;">
+  <div class="fs-1 mb-2" style="color: var(--sp-red)"><i class="bi bi-shield-lock"></i></div>
+  <h4 class="fw-bold" style="color: var(--sp-navy)">Access Denied</h4>
+  <p class="text-muted">{{ exception|default:"You don't have access to this branch's data." }}</p>
+  <a href="{% url 'dashboard:home' %}" class="btn text-white" style="background: var(--sp-navy)">Back to Dashboard</a>
+</div>
+{% endblock %}

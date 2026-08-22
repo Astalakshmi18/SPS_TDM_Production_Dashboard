@@ -1,0 +1,41 @@
+{
+  "project_key": "HOR",
+  "display_name": "HOR Project (template - adjust sheet/column names once the real file arrives)",
+  "branch": "MDU",
+  "config": {
+    "project_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "Project Name"
+    },
+    "branch": {
+      "mode": "static",
+      "value": "MDU"
+    },
+    "start_date": {
+      "mode": "header",
+      "sheet": "Delivery Plan",
+      "column": "Project Start Date"
+    },
+    "end_date": {
+      "mode": "header",
+      "sheet": "Delivery Plan",
+      "column": "End Date"
+    },
+    "target": {
+      "mode": "header",
+      "sheet": "Delivery Plan",
+      "column": "Target Records"
+    },
+    "delivered": {
+      "mode": "header",
+      "sheet": "Delivery Plan",
+      "column": "Delivered Records"
+    },
+    "images": {
+      "mode": "header",
+      "sheet": "Delivery Plan",
+      "column": "Total Images"
+    }
+  }
+}

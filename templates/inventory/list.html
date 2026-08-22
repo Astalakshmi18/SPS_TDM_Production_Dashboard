@@ -1,0 +1,266 @@
+{% extends "base/base.html" %}
+{% load inventory_tags %}
+{% block content %}
+<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'inventory:list' %}" class="btn btn-sm btn-outline-secondary" title="Back to Projects"><i class="bi bi-arrow-left"></i></a>
+    <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Inventory Tracker</h4>
+    {% if selected_project %}
+      <span class="badge bg-primary px-2 py-1 fs-6 fw-semibold">{{ selected_project.project_name }}</span>
+    {% endif %}
+  </div>
+  {% if selected_project and request.user.profile.can_edit_projects %}
+    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap ms-auto" onclick="spOpenColumnsModal(event)" data-bs-toggle="modal" data-bs-target="#columnsModal">
+      <i class="bi bi-sliders me-1"></i> Customize Columns
+    </button>
+  {% endif %}
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-lg-4">
+    <div class="kpi-card kpi-navy">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="kpi-label">Total Rows</div>
+          <div class="kpi-value">{{ page_obj.paginator.count }}</div>
+        </div>
+        <i class="bi bi-card-list fs-3 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-4">
+    <div class="kpi-card kpi-teal">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="kpi-label">Total Images</div>
+          <div class="kpi-value">{{ totals.images|default:0|floatformat:0 }}</div>
+        </div>
+        <i class="bi bi-images fs-3 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-4">
+    <div class="kpi-card kpi-green">
+      <div class="d-flex align-items-center justify-content-between">
+        <div>
+          <div class="kpi-label">Total Records</div>
+          <div class="kpi-value">{{ totals.records|default:0|floatformat:0 }}</div>
+        </div>
+        <i class="bi bi-database-check fs-3 opacity-50"></i>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Search & Filter Panel -->
+<div class="sp-panel">
+  <form method="get" class="row g-2 align-items-center mb-3">
+    <input type="hidden" name="project" value="{{ selected_project.pk }}">
+    <div class="col-md-4">
+      <div class="input-group input-group-sm">
+        <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
+        <input name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search file or folder name...">
+      </div>
+    </div>
+    <div class="col-md-3">
+      <input type="text" class="form-control form-control-sm bg-light text-secondary fw-semibold" value="{{ selected_project.project_name }}" disabled>
+    </div>
+    <div class="col-md-2">
+      <select name="event_type" class="form-select form-select-sm">
+        <option value="">All Event Types</option>
+        {% for e in event_types %}<option value="{{ e }}" {% if selected_event_type == e %}selected{% endif %}>{{ e }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="language" class="form-select form-select-sm">
+        <option value="">All Languages</option>
+        {% for l in languages %}<option value="{{ l }}" {% if selected_language == l %}selected{% endif %}>{{ l }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="col-md-1">
+      <button class="btn btn-outline-primary btn-sm w-100 fw-semibold">Filter</button>
+    </div>
+  </form>
+
+  <!-- Inventory Data Table -->
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle sp-inventory-table">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>File / Folder</th>
+          {% for col in visible_columns %}
+            <th>
+              {{ available_columns|get_item:col|default:col }}
+              {% if col in defined_custom_columns %}<span class="sp-col-tag">Custom</span>{% endif %}
+            </th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in page_obj %}
+        <tr>
+          <td class="fw-semibold"><a href="{% url 'projects:detail' item.project.pk %}" class="text-decoration-none text-navy">{{ item.project.project_name }}</a></td>
+          <td class="font-monospace text-dark">{{ item.file_name|default:item.folder_name }}</td>
+          {% for col in visible_columns %}
+            <td>
+              {% if col == 'event_type' %}
+                {% if item.event_type %}<span class="sp-badge-event">{{ item.event_type }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              {% elif col == 'language' %}
+                {% if item.language %}<span class="sp-badge-lang">{{ item.language }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              {% elif col == 'image_count' %}
+                <span class="fw-semibold">{{ item.image_count }}</span>
+              {% elif col == 'record_count' %}
+                <span class="fw-semibold">{{ item.record_count }}</span>
+              {% elif col == 'shipment_date' %}
+                {% if item.shipment_date %}<span class="badge bg-light text-dark border">{{ item.shipment_date }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+              {% elif col == 'remarks' %}
+                {{ item.remarks|default:"—" }}
+              {% else %}
+                {% with val=item.extra|get_item:col %}
+                  {% if val != None %}{{ val }}{% else %}<span class="text-muted">—</span>{% endif %}
+                {% endwith %}
+              {% endif %}
+            </td>
+          {% endfor %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="{{ visible_columns|length|add:2 }}" class="text-muted text-center py-4">No inventory rows found. Import a project with an <code>inventory_rows</code> mapping to populate data.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {% if page_obj.paginator.num_pages > 1 %}
+  <nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-end mb-0">
+      {% if page_obj.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_project %}&project={{ selected_project.pk }}{% endif %}">Prev</a></li>{% endif %}
+      <li class="page-item disabled"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+      {% if page_obj.has_next %}<li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_project %}&project={{ selected_project.pk }}{% endif %}">Next</a></li>{% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+
+<!-- Modal Dialog for Column Customization -->
+{% if selected_project and request.user.profile.can_edit_projects %}
+<div class="modal fade" id="columnsModal" tabindex="-1" aria-labelledby="columnsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content shadow-lg border-0">
+      <div class="modal-header bg-navy text-white">
+        <h5 class="modal-title fw-bold" id="columnsModalLabel"><i class="bi bi-sliders me-2"></i>Customize Columns</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="text-muted small mb-3">Check the boxes below to choose which columns appear on this project's inventory tracker.</p>
+
+        <form method="post" id="columnsForm">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_visibility">
+          <div class="sp-checklist-scroll mb-3">
+          {% for key, label in available_columns.items %}
+          <div class="sp-col-item d-flex justify-content-between align-items-center" onclick="spToggleColItem(event, this)">
+            <div class="form-check mb-0 gap-2">
+              <input class="form-check-input me-2" type="checkbox" name="visible_columns" value="{{ key }}" id="col_{{ key }}" {% if key in visible_columns %}checked{% endif %}>
+              <label class="form-check-label fw-semibold small text-dark" for="col_{{ key }}">
+                {{ label }}
+                {% if key in defined_custom_columns %}<span class="sp-col-tag">Custom</span>{% endif %}
+              </label>
+            </div>
+            {% if key in defined_custom_columns %}
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary py-0 px-2" onclick="editCustomColumn('{{ key|escapejs }}')" title="Edit Column Name"><i class="bi bi-pencil small"></i></button>
+              <button type="button" class="btn btn-outline-danger py-0 px-2" onclick="deleteCustomColumn('{{ key|escapejs }}')" title="Delete Custom Column"><i class="bi bi-trash small"></i></button>
+            </div>
+            {% endif %}
+          </div>
+          {% endfor %}
+          </div>
+          <div class="text-end">
+            <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4">Save Visibility</button>
+          </div>
+        </form>
+
+        <hr class="my-3">
+
+        <h6 class="fw-bold mb-2 text-navy"><i class="bi bi-plus-circle me-1"></i>Add New Custom Column</h6>
+        <form method="post" class="d-flex gap-2">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="add_column">
+          <input type="text" name="new_column_name" class="form-control form-control-sm" placeholder="e.g. Section, Batch ID, Remarks..." required>
+          <button type="submit" class="btn btn-success btn-sm text-nowrap rounded-pill px-3">Add Column</button>
+        </form>
+
+        <!-- Hidden forms for Edit/Delete actions -->
+        <form method="post" id="editColumnForm" style="display: none;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="edit_column">
+          <input type="hidden" name="old_column_name" id="edit_old_name">
+          <input type="hidden" name="new_column_name" id="edit_new_name">
+        </form>
+        <form method="post" id="deleteColumnForm" style="display: none;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_column">
+          <input type="hidden" name="column_name" id="delete_col_name">
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<script>
+function spToggleColItem(e, el) {
+  if (e.target.closest('.btn-group') || e.target.closest('.btn') || e.target.tagName === 'INPUT') {
+    return;
+  }
+  var checkbox = el.querySelector('.form-check-input');
+  if (checkbox) {
+    checkbox.checked = !checkbox.checked;
+  }
+}
+
+function spOpenColumnsModal(e) {
+  if (e) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+  }
+  var modalEl = document.getElementById('columnsModal');
+  if (modalEl) {
+    if (modalEl.parentElement !== document.body) {
+      document.body.appendChild(modalEl);
+    }
+    if (typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+      var modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+      modal.show();
+    }
+  }
+}
+
+document.addEventListener('hidden.bs.modal', function (e) {
+  if (e.target && e.target.id === 'columnsModal') {
+    document.querySelectorAll('.modal-backdrop').forEach(function(b) { b.remove(); });
+    document.body.classList.remove('modal-open');
+    document.body.style.removeProperty('padding-right');
+    document.body.style.removeProperty('overflow');
+  }
+});
+
+function editCustomColumn(oldName) {
+  const newName = prompt("Enter new name for column:", oldName);
+  if (newName && newName.trim() !== "" && newName !== oldName) {
+    document.getElementById('edit_old_name').value = oldName;
+    document.getElementById('edit_new_name').value = newName.trim();
+    document.getElementById('editColumnForm').submit();
+  }
+}
+
+function deleteCustomColumn(colName) {
+  if (confirm("Are you sure you want to delete the custom column '" + colName + "'?")) {
+    document.getElementById('delete_col_name').value = colName;
+    document.getElementById('deleteColumnForm').submit();
+  }
+}
+</script>
+{% endblock %}

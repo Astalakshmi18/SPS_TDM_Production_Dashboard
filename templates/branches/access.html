@@ -1,0 +1,23 @@
+{% extends "base/base.html" %}
+{% block content %}
+<h4 class="fw-bold mb-1" style="color: var(--sp-navy)">Branch Access — {{ branch.code }}</h4>
+<p class="text-muted small mb-3">Administrators always have full access and aren't listed here. Check every
+Branch Manager / Viewer who should be able to see and act on {{ branch.name }}'s data.</p>
+
+<div class="sp-panel" style="max-width: 480px">
+  <form method="post">
+    {% csrf_token %}
+    {% for u in all_users %}
+    <div class="form-check">
+      <input type="checkbox" name="users" value="{{ u.pk }}" class="form-check-input" id="user{{ u.pk }}"
+             {% if u.pk in granted_ids %}checked{% endif %}>
+      <label class="form-check-label" for="user{{ u.pk }}">{{ u.username }} <span class="text-muted small">({{ u.profile.role }})</span></label>
+    </div>
+    {% empty %}
+    <p class="text-muted small">No Manager/Viewer users yet.</p>
+    {% endfor %}
+    <button class="btn text-white mt-3" style="background: var(--sp-navy)">Save Access</button>
+    <a href="{% url 'branches:list' %}" class="btn btn-outline-secondary mt-3">Cancel</a>
+  </form>
+</div>
+{% endblock %}
