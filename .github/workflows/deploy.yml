@@ -51,3 +51,4 @@ jobs:
             docker compose down || true
             docker compose up -d --build
             docker compose exec -T web python manage.py migrate --noinput
+            docker compose exec -T web python manage.py create_default_admin || true
