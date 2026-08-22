@@ -329,6 +329,13 @@ def extract_inventory_rows(cache, rule: dict) -> list:
     return [r for r in records if not _is_junk_row(r)]
 
 
+def safe_load_workbook(xls_path, data_only=True):
+    try:
+        return openpyxl.load_workbook(xls_path, data_only=data_only, read_only=True)
+    except Exception:
+        return openpyxl.load_workbook(xls_path, data_only=data_only, read_only=False)
+
+
 def apply_mapping(xls_path, config: dict) -> MappingResult:
     """Run every field's extraction rule against the uploaded workbook and
     return a standard-schema dict, ready to save into Project.
@@ -340,10 +347,9 @@ def apply_mapping(xls_path, config: dict) -> MappingResult:
     result = MappingResult()
     cache = _SheetCache(xls_path)
 
-    # Single read-only, values-only workbook load, reused for every
-    # cell-mode rule AND for the sheet-name validation below - previously
-    # this file was opened from scratch up to 3 separate times.
-    wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=True)
+    # Values-only workbook load with read_only=True fallback to read_only=False
+    # to prevent openpyxl's streaming dimension parser bug on exported Google Sheets.
+    wb = safe_load_workbook(xls_path, data_only=True)
     try:
         sheet_names = wb.sheetnames
 

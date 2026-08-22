@@ -190,7 +190,11 @@ def _detect_inventory_rows(wb):
 
 def detect_mapping(xls_path: str) -> dict:
     """Returns {"config": {...}, "notes": [...], "confidence": "high"|"medium"|"low"}"""
-    wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=True)
+    try:
+        wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=True)
+    except Exception:
+        wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=False)
+
     try:
         return _detect_mapping_inner(xls_path, wb)
     finally:

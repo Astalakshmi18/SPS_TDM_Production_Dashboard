@@ -67,7 +67,10 @@ def read_project_summary_snapshot(xls_path):
     import openpyxl
 
     try:
-        wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=True)
+        try:
+            wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=True)
+        except Exception:
+            wb = openpyxl.load_workbook(xls_path, data_only=data_only if 'data_only' in locals() else True, read_only=False)
     except Exception:
         return {}
     if "Project Summary" not in wb.sheetnames:
