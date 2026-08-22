@@ -242,43 +242,53 @@ def project_upload(request):
         template_id = request.POST.get("template")
         template = get_object_or_404(ProjectTemplate, pk=template_id)
 
-        if not request.user.profile.can_access_branch(template.branch):
+        if template.branch and not request.user.profile.can_access_branch(template.branch):
             messages.error(request, f"You don't have access to the '{template.branch}' branch.")
             return redirect("projects:upload")
 
-        if source == "gsheet":
-            sheet_url = request.POST.get("sheet_url", "").strip()
-            if not sheet_url:
-                messages.error(request, "Please paste a Google Sheet link.")
-                return redirect("projects:upload")
-            try:
-                full_path = download_as_xlsx(sheet_url)
-            except GoogleSheetError as exc:
-                messages.error(request, f"Google Sheet import failed: {exc}")
-                return redirect("projects:upload")
+        # Ensure uploads media directory exists
+        (settings.MEDIA_ROOT / "uploads").mkdir(parents=True, exist_ok=True)
 
-            project, errors = run_import(
-                template, full_path, sheet_url, request.user,
-                source_type=ImportBatch.SOURCE_GOOGLE_SHEET, source_url=sheet_url,
-            )
-        else:
-            excel_file = request.FILES.get("excel_file")
-            if not excel_file:
-                messages.error(request, "Please choose an Excel file.")
-                return redirect("projects:upload")
-            saved_path = default_storage.save(f"uploads/{excel_file.name}", excel_file)
-            full_path = default_storage.path(saved_path)
+        try:
+            if source == "gsheet":
+                sheet_url = request.POST.get("sheet_url", "").strip()
+                if not sheet_url:
+                    messages.error(request, "Please paste a Google Sheet link.")
+                    return redirect("projects:upload")
+                try:
+                    full_path = download_as_xlsx(sheet_url)
+                except GoogleSheetError as exc:
+                    messages.error(request, f"Google Sheet import failed: {exc}")
+                    return redirect("projects:upload")
 
-            project, errors = run_import(
-                template, full_path, excel_file.name, request.user,
-                source_type=ImportBatch.SOURCE_FILE,
-            )
+                project, errors = run_import(
+                    template, full_path, sheet_url, request.user,
+                    source_type=ImportBatch.SOURCE_GOOGLE_SHEET, source_url=sheet_url,
+                )
+            else:
+                excel_file = request.FILES.get("excel_file")
+                if not excel_file:
+                    messages.error(request, "Please choose an Excel file.")
+                    return redirect("projects:upload")
+                saved_path = default_storage.save(f"uploads/{excel_file.name}", excel_file)
+                try:
+                    full_path = default_storage.path(saved_path)
+                except (NotImplementedError, AttributeError):
+                    full_path = str(settings.MEDIA_ROOT / saved_path)
 
-        if errors:
-            messages.error(request, "Import failed: " + "; ".join(errors))
-        else:
-            messages.success(request, f"'{project.project_name}' imported and dashboard refreshed.")
-            return redirect("projects:detail", pk=project.pk)
+                project, errors = run_import(
+                    template, full_path, excel_file.name, request.user,
+                    source_type=ImportBatch.SOURCE_FILE,
+                )
+
+            if errors:
+                messages.error(request, "Import failed: " + "; ".join(errors))
+            elif project:
+                messages.success(request, f"'{project.project_name}' imported and dashboard refreshed.")
+                return redirect("projects:detail", pk=project.pk)
+        except Exception as exc:
+            messages.error(request, f"File processing error: {exc}")
+            return redirect("projects:upload")
 
     return render(request, "projects/upload.html", {
         "templates": templates,

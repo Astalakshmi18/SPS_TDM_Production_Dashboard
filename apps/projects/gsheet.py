@@ -44,8 +44,12 @@ def download_as_xlsx(url_or_id: str) -> str:
     sheet_id = extract_sheet_id(url_or_id)
     export_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=xlsx"
 
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
     try:
-        response = requests.get(export_url, timeout=30)
+        response = requests.get(export_url, headers=headers, allow_redirects=True, timeout=30)
     except requests.RequestException as exc:
         raise GoogleSheetError(f"Could not reach Google Sheets: {exc}") from exc
 
@@ -55,11 +59,11 @@ def download_as_xlsx(url_or_id: str) -> str:
             "Make sure link sharing is set to 'Anyone with the link can view'."
         )
 
-    content_type = response.headers.get("Content-Type", "")
-    if "spreadsheet" not in content_type and "octet-stream" not in content_type:
+    # Check if Google returned an HTML login/permission page instead of Excel binary
+    content_start = response.content[:500].lower()
+    if b"<!doctype" in content_start or b"<html" in content_start or b"accounts.google.com" in content_start:
         raise GoogleSheetError(
-            "That didn't come back as a spreadsheet - the sheet is probably "
-            "private. Set sharing to 'Anyone with the link can view' and try again."
+            "That Google Sheet is private or requires login. Set sharing permissions to 'Anyone with the link can view' and try again."
         )
 
     uploads_dir = settings.MEDIA_ROOT / "uploads"
