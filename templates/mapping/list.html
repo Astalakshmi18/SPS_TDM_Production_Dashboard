@@ -1,46 +1,62 @@
 {% extends "base/base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold" style="color: var(--sp-navy)">Template Mapping</h4>
-  <div>
-    <a href="{% url 'mapping:auto_detect' %}" class="btn btn-sm btn-outline-success"><i class="bi bi-magic"></i> Auto-Detect from Excel</a>
-    <a href="{% url 'mapping:create' %}" class="btn btn-sm btn-outline-primary">+ New Template</a>
+<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <h4 class="fw-bold mb-0" style="color: var(--sp-navy)"><i class="bi bi-diagram-3-fill me-2"></i>Template Mapping</h4>
+  </div>
+  <div class="d-flex align-items-center gap-2 ms-auto">
+    <a href="{% url 'mapping:auto_detect' %}" class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-magic me-1"></i> Auto-Detect</a>
+    <a href="{% url 'mapping:create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-plus-lg me-1"></i> New Template</a>
     {% if user.profile.is_admin %}
-    <form method="post" action="{% url 'mapping:sync' %}" class="d-inline">
+    <form method="post" action="{% url 'mapping:sync' %}" class="d-inline mb-0">
       {% csrf_token %}
-      <button class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-repeat"></i> Sync from /mappings folder</button>
+      <button class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-arrow-repeat me-1"></i> Sync from /mappings</button>
     </form>
     {% endif %}
   </div>
 </div>
+
 <div class="sp-panel">
-  <!-- <p class="text-muted small">Each row is a reusable mapping config that tells the import engine exactly where to find
-  each standard-schema field in that project's Excel file - so BPW, Latvia, SSH, HOR (and anything new) can all be
-  uploaded without ever touching the dashboard code. Don't want to write JSON by hand? Use
-  <a href="{% url 'mapping:auto_detect' %}">Auto-Detect</a> to guess a template from a sample file, review it, then save it for reuse.</p> -->
   <div class="table-responsive">
-  <table class="table table-hover">
-    <thead><tr><th>Key</th><th>Display Name</th><th>Branch</th><th>Active</th><th>Updated</th><th></th></tr></thead>
-    <tbody>
-      {% for t in templates %}
-      <tr>
-        <td><a href="{% url 'mapping:detail' t.pk %}">{{ t.project_key }}</a></td>
-        <td>{{ t.display_name }}</td>
-        <td>{{ t.branch.code }}</td>
-        <td>{% if t.is_active %}<span class="badge bg-success">Active</span>{% else %}<span class="badge bg-secondary">Inactive</span>{% endif %}</td>
-        <td class="small text-muted">{{ t.updated_at }}</td>
-        <td class="text-end">
-          <a href="{% url 'mapping:edit' t.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-          {% if user.profile.is_admin %}
-          <a href="{% url 'mapping:delete' t.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
-          {% endif %}
-        </td>
-      </tr>
-      {% empty %}
-      <tr><td colspan="6" class="text-muted text-center py-3">No templates yet. Try Auto-Detect or "Sync from /mappings folder".</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+    <table class="table table-hover table-sm align-middle sp-inventory-table">
+      <thead>
+        <tr>
+          <th>Key</th>
+          <th>Display Name</th>
+          <th>Branch</th>
+          <th>Status</th>
+          <th>Updated</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in templates %}
+        <tr>
+          <td class="fw-bold"><a href="{% url 'mapping:detail' t.pk %}" class="text-decoration-none text-navy">{{ t.project_key }}</a></td>
+          <td class="fw-semibold">{{ t.display_name }}</td>
+          <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ t.branch.code }}</span></td>
+          <td>
+            {% if t.is_active %}
+              <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle"><i class="bi bi-check-circle me-1"></i> Active</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle">Inactive</span>
+            {% endif %}
+          </td>
+          <td class="small text-muted">{{ t.updated_at|date:"d M Y, H:i" }}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a href="{% url 'mapping:edit' t.pk %}" class="btn btn-outline-secondary py-0 px-2" title="Edit Template"><i class="bi bi-pencil small"></i></a>
+              {% if user.profile.is_admin %}
+              <a href="{% url 'mapping:delete' t.pk %}" class="btn btn-outline-danger py-0 px-2" title="Delete Template"><i class="bi bi-trash small"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center py-4">No mapping templates found. Try Auto-Detect or click "Sync from /mappings".</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 {% endblock %}

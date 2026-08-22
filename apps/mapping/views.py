@@ -30,8 +30,32 @@ def _save_template_to_disk(project_key, display_name, branch_code, config):
     (settings.MAPPINGS_DIR / file_name).write_text(json.dumps(data, indent=2))
 
 
+def _ensure_branches_exist():
+    if Branch.objects.count() == 0:
+        for code, name in getattr(settings, "BRANCH_CHOICES", [("TDM", "Tindivanam"), ("CHN", "Chennai"), ("KPM", "Kanchipuram"), ("MDU", "Madurai")]):
+            Branch.objects.get_or_create(code=code, defaults={"name": name})
+
+
 @role_required(UserProfile.ROLE_ADMIN, UserProfile.ROLE_MANAGER)
 def template_list(request):
+    _ensure_branches_exist()
+    if ProjectTemplate.objects.count() == 0 and hasattr(settings, "MAPPINGS_DIR") and settings.MAPPINGS_DIR.exists():
+        for path in sorted(settings.MAPPINGS_DIR.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                branch = Branch.objects.filter(code=data.get("branch", "TDM")).first() or Branch.objects.first()
+                if branch:
+                    ProjectTemplate.objects.update_or_create(
+                        project_key=data["project_key"],
+                        defaults={
+                            "display_name": data.get("display_name", data["project_key"]),
+                            "branch": branch,
+                            "config": data["config"],
+                        },
+                    )
+            except Exception:
+                pass
+
     templates = branch_queryset(request, ProjectTemplate.objects.select_related("branch"))
     return render(request, "mapping/list.html", {"templates": templates})
 
@@ -51,22 +75,26 @@ def sync_from_disk(request):
     This is how new project formats get onboarded: drop a mapping JSON in
     the folder (or edit an existing one) and click Sync - no code change,
     no redeploy."""
+    _ensure_branches_exist()
     created, updated = 0, 0
-    for path in sorted(settings.MAPPINGS_DIR.glob("*.json")):
-        data = json.loads(path.read_text())
-        branch = Branch.objects.filter(code=data.get("branch", "TDM")).first()
-        if not branch:
-            branch = Branch.objects.first()
-        obj, was_created = ProjectTemplate.objects.update_or_create(
-            project_key=data["project_key"],
-            defaults={
-                "display_name": data.get("display_name", data["project_key"]),
-                "branch": branch,
-                "config": data["config"],
-            },
-        )
-        created += int(was_created)
-        updated += int(not was_created)
+    if hasattr(settings, "MAPPINGS_DIR") and settings.MAPPINGS_DIR.exists():
+        for path in sorted(settings.MAPPINGS_DIR.glob("*.json")):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                branch = Branch.objects.filter(code=data.get("branch", "TDM")).first() or Branch.objects.first()
+                if branch:
+                    obj, was_created = ProjectTemplate.objects.update_or_create(
+                        project_key=data["project_key"],
+                        defaults={
+                            "display_name": data.get("display_name", data["project_key"]),
+                            "branch": branch,
+                            "config": data["config"],
+                        },
+                    )
+                    created += int(was_created)
+                    updated += int(not was_created)
+            except Exception as exc:
+                messages.error(request, f"Error syncing {path.name}: {exc}")
 
     messages.success(request, f"Synced mapping templates: {created} created, {updated} updated.")
     return redirect("mapping:list")
@@ -76,6 +104,7 @@ def sync_from_disk(request):
 def template_create(request):
     """Manual CRUD entry - hand-write (or paste) a mapping config directly.
     A Manager can only create templates for branches they have access to."""
+    _ensure_branches_exist()
     branches = accessible_branches(request)
 
     if request.method == "POST":
@@ -83,7 +112,7 @@ def template_create(request):
         display_name = request.POST.get("display_name", "").strip()
         branch_code = request.POST.get("branch", "")
         config_text = request.POST.get("config", "{}")
-        branch = Branch.objects.filter(code=branch_code).first()
+        branch = Branch.objects.filter(code=branch_code).first() or Branch.objects.first()
 
         if not request.user.profile.can_access_branch(branch):
             messages.error(request, "You don't have access to create templates for that branch.")
@@ -105,7 +134,7 @@ def template_create(request):
             project_key=project_key,
             defaults={"display_name": display_name, "branch": branch, "config": config},
         )
-        _save_template_to_disk(project_key, display_name, branch.code, config)
+        _save_template_to_disk(project_key, display_name, branch.code if branch else "TDM", config)
         messages.success(request, f"Template '{project_key}' created.")
         return redirect("mapping:list")
 
