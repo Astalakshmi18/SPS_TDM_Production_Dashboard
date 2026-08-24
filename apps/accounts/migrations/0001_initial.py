@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             name='UserProfile',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('role', models.CharField(choices=[('ADMIN', 'Administrator'), ('MANAGER', 'Branch Manager'), ('VIEWER', 'Viewer')], default='VIEWER', max_length=10)),
+                ('role', models.CharField(choices=[('ADMIN', 'Administrator'), ('MANAGER', 'General Manager'), ('VIEWER', 'Viewer')], default='VIEWER', max_length=10)),
                 ('branches', models.ManyToManyField(blank=True, help_text='Which branches this user can see/manage. Ignored for ADMIN (always full access). Leave empty for MANAGER/VIEWER to grant no branch access yet.', related_name='user_profiles', to='branches.branch')),
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL)),
             ],

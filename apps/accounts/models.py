@@ -8,7 +8,7 @@ class UserProfile(models.Model):
     Roles:
       ADMIN    - full access everywhere: branches, mapping templates, users,
                  all projects/inventory across every branch, no restriction.
-      MANAGER  - Branch Manager. Scoped to their assigned branch(es), but
+      MANAGER  - General Manager. Scoped to their assigned branch(es), but
                  sees and can Add/Edit/Delete EVERY project within those
                  branches (not scoped down to individual projects) - also
                  the only non-ADMIN role that manages mapping templates.
@@ -47,7 +47,7 @@ class UserProfile(models.Model):
     ROLE_VIEWER = "VIEWER"
     ROLE_CHOICES = [
         (ROLE_ADMIN, "Administrator"),
-        (ROLE_MANAGER, "Branch Manager"),
+        (ROLE_MANAGER, "General Manager"),
         (ROLE_PL, "Project Lead"),
         (ROLE_PM, "Project Manager"),
         (ROLE_VIEWER, "Viewer"),
@@ -63,7 +63,7 @@ class UserProfile(models.Model):
     projects = models.ManyToManyField(
         "projects.Project", blank=True, related_name="assigned_profiles",
         help_text="Which SPECIFIC projects this user can see/manage, on top of branch access. Only "
-                   "enforced for Project Manager, Project Lead, and Viewer roles - Admin/Branch Manager "
+                   "enforced for Project Manager, Project Lead, and Viewer roles - Admin/General Manager "
                    "are governed by branch access alone and ignore this field. Leave empty for PM/PL/"
                    "Viewer to grant no project access yet.",
     )

@@ -22,7 +22,7 @@
     <div class="mb-3">
       <label class="form-label">Branch Access</label>
       <div class="form-text mb-2">Administrators always have full access to every branch regardless of what's
-        checked here. For Branch Manager / Viewer, check every branch this person should be able to see and act on —
+        checked here. For General Manager / Viewer, check every branch this person should be able to see and act on —
         leave all unchecked to grant no access yet.</div>
       {% for b in branches %}
       <div class="form-check">
@@ -36,7 +36,7 @@
       <label class="form-label">Project Access <span class="text-muted fw-normal">(Project Manager &amp; Viewer only)</span></label>
       <div class="form-text mb-2">Only enforced for the <strong>Project Manager</strong> and <strong>Viewer</strong> roles - they'll
         see/act on exactly the projects checked here (still limited to their checked branches above). Ignored for
-        Administrator / Branch Manager / Project Lead, who go by Branch Access alone. Leave unchecked for a new
+        Administrator / General Manager / Project Lead, who go by Branch Access alone. Leave unchecked for a new
         Project Manager/Viewer to grant no project access yet.</div>
       <div class="sp-checklist-scroll">
         {% for p in projects %}

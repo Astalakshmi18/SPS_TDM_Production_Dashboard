@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='userprofile',
             name='projects',
-            field=models.ManyToManyField(blank=True, help_text='Which SPECIFIC projects this user can see/manage, on top of branch access. Only enforced for Project Manager, Project Lead, and Viewer roles - Admin/Branch Manager are governed by branch access alone and ignore this field. Leave empty for PM/PL/Viewer to grant no project access yet.', related_name='assigned_profiles', to='projects.project'),
+            field=models.ManyToManyField(blank=True, help_text='Which SPECIFIC projects this user can see/manage, on top of branch access. Only enforced for Project Manager, Project Lead, and Viewer roles - Admin/General Manager are governed by branch access alone and ignore this field. Leave empty for PM/PL/Viewer to grant no project access yet.', related_name='assigned_profiles', to='projects.project'),
         ),
     ]
