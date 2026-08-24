@@ -13,7 +13,7 @@
       {% endif %}
       <div class="col-md-4">
         <label class="form-label">Display Name</label>
-        <input name="display_name" class="form-control" value="{{ display_name|default:template.display_name|default:'' }}" required>
+        <input name="display_name" class="form-control" value="{% firstof display_name template.display_name '' %}" required>
       </div>
       <div class="col-md-4">
         <label class="form-label">Branch</label>
