@@ -47,10 +47,12 @@ def _cell_date(ws, addr):
 
 
 def read_project_summary_snapshot(xls_path):
-    """Reads the Project Summary sheet's OWN pre-computed cells - Delivered/
-    Received Records, %, Days Gone, Remaining Days etc. - directly, instead
-    of Python re-deriving them. Every real project file checked (Latvia,
-    Newspaper, BPW, BV_AT) uses the identical cell layout:
+    """Reads the Project/Production Summary sheet's OWN pre-computed cells -
+    Delivered/Received Records, %, Days Gone, Remaining Days etc. - directly,
+    instead of Python re-deriving them. The tab itself may be named either
+    "Project Summary" or "Production Summary" (both seen in real project
+    files) - whichever is present is used. Every real project file checked
+    (Latvia, Newspaper, BPW, BV_AT, ANC) uses the identical cell layout:
       B1/D1/F1/H1  = status-as-of date / start / end / total days
       B2/C2        = volume / unit label ("records" or "Pages")
       A4/B4/C4     = Delivered label / value / Days Gone
@@ -73,9 +75,15 @@ def read_project_summary_snapshot(xls_path):
             wb = openpyxl.load_workbook(xls_path, data_only=True, read_only=False)
     except Exception:
         return {}
-    if "Project Summary" not in wb.sheetnames:
+    # Real project files use either "Project Summary" or "Production
+    # Summary" as this tab's name - same layout, just a naming difference
+    # between templates. Try both rather than hardcoding one and silently
+    # returning {} (and losing volume_unit/delivered_pct/days_gone/etc, not
+    # just the sheet lookup itself) for every file that uses the other name.
+    sheet_name = next((n for n in ("Project Summary", "Production Summary") if n in wb.sheetnames), None)
+    if sheet_name is None:
         return {}
-    ws = wb["Project Summary"]
+    ws = wb[sheet_name]
 
     a1 = str(ws["A1"].value or "").strip().lower()
     if "project status" not in a1:
