@@ -366,13 +366,13 @@
         </select>
         {% endif %}
 
-        <label class="form-label small">Vendor</label>
+        <!-- <label class="form-label small">Vendor</label>
         <select name="vendor" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All Vendors</option>
           {% for v in vendors %}
             <option value="{{ v }}" {% if selected_vendor == v %}selected{% endif %}>{{ v }}</option>
           {% endfor %}
-        </select>
+        </select> -->
 
         {% if show_project_filter %}
         <label class="form-label small">Project</label>
