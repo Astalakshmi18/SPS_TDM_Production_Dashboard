@@ -43,6 +43,12 @@ rule (single sheet - the common case) or a LIST of rules, one per sheet,
 whose rows are unioned - e.g. BV_Inventory_01 + BV_Inventory_02, each with
 its own column names for the same logical fields.
 
+Every pandas-backed rule ("sum_column", "header", "row_count", and
+inventory_rows") accepts an optional `header_row` (1-indexed, default 1) for
+sheets whose real column headers aren't on row 1 - e.g. a row 1 that holds
+target/summary numbers above the actual header row, e.g.
+{"mode": "sum_column", "sheet": "Inventory", "column": "# of Images", "header_row": 2}
+
 Adding project #5 - even one with a differently-split Inventory - never
 touches this file or the dashboard code, only a new JSON template.
 
@@ -95,10 +101,17 @@ class _SheetCache:
         self.xls_path = xls_path
         self._frames = {}
 
-    def get(self, sheet_name):
-        if sheet_name not in self._frames:
-            self._frames[sheet_name] = pd.read_excel(self.xls_path, sheet_name=sheet_name, header=0)
-        return self._frames[sheet_name]
+    def get(self, sheet_name, header_row=1):
+        """header_row is 1-indexed (matches how a person reads row numbers
+        in Excel) - a sheet whose real column headers sit on row 2 (e.g. a
+        row 1 with target/summary numbers above the header) passes
+        header_row=2. Defaults to 1 (pandas header=0), same as before this
+        option existed, so every template written before this change keeps
+        working unchanged."""
+        key = (sheet_name, header_row)
+        if key not in self._frames:
+            self._frames[key] = pd.read_excel(self.xls_path, sheet_name=sheet_name, header=header_row - 1)
+        return self._frames[key]
 
 
 def _get_cell(wb, sheet, cell):
@@ -117,8 +130,8 @@ def _normalize_header(s):
     return " ".join(str(s).split()).lower()
 
 
-def _sum_column(cache, sheet, column):
-    df = cache.get(sheet)
+def _sum_column(cache, sheet, column, header_row=1):
+    df = cache.get(sheet, header_row)
     match = next((c for c in df.columns if _normalize_header(c) == _normalize_header(column)), None)
     if match is None:
         raise KeyError(f"Column '{column}' not found on sheet '{sheet}'")
@@ -134,8 +147,8 @@ def _sum_column(cache, sheet, column):
     return pd.to_numeric(df[match], errors="coerce").fillna(0).sum()
 
 
-def _header_lookup(cache, sheet, column, row=0):
-    df = cache.get(sheet)
+def _header_lookup(cache, sheet, column, row=0, header_row=1):
+    df = cache.get(sheet, header_row)
     matches = [c for c in df.columns if _normalize_header(c) == _normalize_header(column)]
     if not matches:
         raise KeyError(f"Header '{column}' not found on sheet '{sheet}'")
@@ -145,7 +158,7 @@ def _header_lookup(cache, sheet, column, row=0):
     return series.iloc[row]
 
 
-def _row_count(cache, sheet, id_column=None, where_column=None, where_column_blank=None):
+def _row_count(cache, sheet, id_column=None, where_column=None, where_column_blank=None, header_row=1):
     """Counts real data rows on a flat sheet - used for fields like
     `total_batches`/`promoted`/`batches_being_keyed` when the true count of
     batches lives on a raw per-row sheet rather than a single summary cell
@@ -161,7 +174,7 @@ def _row_count(cache, sheet, id_column=None, where_column=None, where_column_bla
     `where_column_blank` is the inverse - counts only rows where that
     column IS blank, e.g. "batches still being keyed" = rows with no
     Shipment date yet. Only one of the two should be set."""
-    df = cache.get(sheet)
+    df = cache.get(sheet, header_row)
     if id_column:
         match = next((c for c in df.columns if _normalize_header(c) == _normalize_header(id_column)), None)
         if match is None:
@@ -200,11 +213,11 @@ def extract_field(wb, cache, rule: dict):
     if mode == "cell":
         return _get_cell(wb, rule["sheet"], rule["cell"])
     if mode == "sum_column":
-        return _sum_column(cache, rule["sheet"], rule["column"])
+        return _sum_column(cache, rule["sheet"], rule["column"], rule.get("header_row", 1))
     if mode == "header":
-        return _header_lookup(cache, rule["sheet"], rule["column"], rule.get("row", 0))
+        return _header_lookup(cache, rule["sheet"], rule["column"], rule.get("row", 0), rule.get("header_row", 1))
     if mode == "row_count":
-        return _row_count(cache, rule["sheet"], rule.get("id_column"), rule.get("where_column"), rule.get("where_column_blank"))
+        return _row_count(cache, rule["sheet"], rule.get("id_column"), rule.get("where_column"), rule.get("where_column_blank"), rule.get("header_row", 1))
     if mode == "sum_multi":
         # Combines the SAME logical value across several sheets - e.g. a
         # project whose batches are split across two Inventory sheets
@@ -265,7 +278,7 @@ def extract_inventory_rows(cache, rule: dict) -> list:
     if not sheet or not columns:
         return []
 
-    df = cache.get(sheet)
+    df = cache.get(sheet, rule.get("header_row", 1))
 
     # doing this per-row was O(rows x columns) and could take minutes on
     # large inventory sheets (tens of thousands of rows).
