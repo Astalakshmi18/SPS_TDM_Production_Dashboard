@@ -3,6 +3,16 @@ Swift Prosys Production Dashboard - Django settings.
 
 Database:
     Defaults to SQLite so the project runs immediately with zero setup.
+    On Render's free tier (or any host with an ephemeral filesystem) this
+    means the database resets on every redeploy/restart/spin-down - so a
+    real external DB is required for anything meant to persist.
+
+    To use Postgres (Render Postgres, Neon, Supabase, etc.):
+      1. pip install dj-database-url psycopg2-binary  (in requirements.txt)
+      2. Set env var DATABASE_URL to the connection string your provider
+         gives you, e.g. postgresql://user:pass@host/dbname
+         (DATABASE_URL takes priority over everything below if set)
+
     To switch to SQL Server:
       1. pip install mssql-django pyodbc   (uncomment in requirements.txt)
       2. Install the "ODBC Driver 17/18 for SQL Server" on the host machine.
@@ -71,8 +81,23 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DB_ENGINE = env("DB_ENGINE", default="sqlite")
+DATABASE_URL = env("DATABASE_URL", default="")
 
-if DB_ENGINE == "mssql":
+if DATABASE_URL:
+    # A real external DB (Render Postgres, Neon, Supabase, ...) - takes
+    # priority over DB_ENGINE so it "just works" the moment this env var is
+    # set, without needing to also flip DB_ENGINE. conn_max_age keeps
+    # connections alive between requests instead of reopening one every
+    # time, and ssl_require=True because every one of these hosted Postgres
+    # providers requires TLS.
+    import dj_database_url
+
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL, conn_max_age=600, ssl_require=True
+        )
+    }
+elif DB_ENGINE == "mssql":
     DATABASES = {
         "default": {
             "ENGINE": "mssql",
