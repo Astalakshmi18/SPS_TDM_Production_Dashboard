@@ -3,8 +3,8 @@
 {% block title %}Dashboard - Swift Prosys{% endblock %}
 {% block content %}
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="fw-bold" style="color: var(--sp-navy)">Production Dashboard</h4>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Production Dashboard</h4>
   <div class="text-muted small">Last Updated: {{ kpis.last_updated|date:"d M Y, H:i"|default:"—" }}</div>
 </div>
 

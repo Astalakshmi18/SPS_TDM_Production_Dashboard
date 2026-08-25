@@ -1,10 +1,10 @@
 {% extends "base/base.html" %}
 {% block content %}
-<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2 mb-3">
   <div class="d-flex align-items-center gap-2">
     <h4 class="fw-bold mb-0" style="color: var(--sp-navy)"><i class="bi bi-people-fill me-2"></i>User Management</h4>
   </div>
-  <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap ms-auto">
+  <a href="{% url 'accounts:user_create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap">
     <i class="bi bi-person-plus-fill me-1"></i> New User
   </a>
 </div>

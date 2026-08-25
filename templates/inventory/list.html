@@ -1,8 +1,8 @@
 {% extends "base/base.html" %}
 {% load inventory_tags %}
 {% block content %}
-<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
-  <div class="d-flex align-items-center gap-2">
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2 mb-3">
+  <div class="d-flex align-items-center flex-wrap gap-2">
     <a href="{% url 'inventory:list' %}" class="btn btn-sm btn-outline-secondary" title="Back to Projects"><i class="bi bi-arrow-left"></i></a>
     <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Inventory Tracker</h4>
     {% if selected_project %}
@@ -10,7 +10,7 @@
     {% endif %}
   </div>
   {% if selected_project and request.user.profile.can_edit_projects %}
-    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap ms-auto" onclick="spOpenColumnsModal(event)" data-bs-toggle="modal" data-bs-target="#columnsModal">
+    <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap" onclick="spOpenColumnsModal(event)" data-bs-toggle="modal" data-bs-target="#columnsModal">
       <i class="bi bi-sliders me-1"></i> Customize Columns
     </button>
   {% endif %}

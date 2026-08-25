@@ -386,7 +386,6 @@ h4.fw-bold { font-size: 1.12rem; }
 .progress-bar-navy { background: linear-gradient(90deg, var(--sp-navy), var(--sp-teal)); border-radius: 5px; transition: width .8s cubic-bezier(.4,0,.2,1); }
 
 .table { font-size: .75rem; }
-.sp-th-narrow { width: 220px; }
 .table-hover tbody tr { transition: background .2s ease, transform .15s ease; }
 .table-hover tbody tr:hover { transform: translateX(2px); }
 
@@ -637,29 +636,6 @@ h4.fw-bold { font-size: 1.12rem; }
   
   .col-6.col-lg-2 { width: 50%; }
   .sp-panel select { width: 100%; }
-
-  /* Key-value info tables (insights, mapping detail, etc.): let the label
-     column shrink instead of holding a desktop-sized fixed width that
-     crowds a phone screen. */
-  .sp-th-narrow { width: auto; min-width: 0; }
-
-  /* Safety net: any plain Bootstrap .table that ISN'T already inside a
-     .table-responsive/.sp-table-scroll wrapper (which handle their own
-     horizontal scrolling) gets to scroll horizontally itself instead of
-     forcing the whole page to overflow or getting silently clipped. */
-  .table:not(.table-responsive .table):not(.sp-table-scroll .table) {
-    display: block;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .table:not(.table-responsive .table):not(.sp-table-scroll .table) tbody,
-  .table:not(.table-responsive .table):not(.sp-table-scroll .table) thead {
-    display: table;
-    width: 100%;
-  }
-
-  /* Images/canvases/iframes never wider than their container on a phone. */
-  img, canvas, iframe { max-width: 100%; height: auto; }
 }
 
 /* Extra Small Screens (< 576px) */
@@ -671,6 +647,18 @@ h4.fw-bold { font-size: 1.12rem; }
   .sp-panel { padding: .65rem; }
   .sp-panel h6 { font-size: .8rem; }
   .sp-modern-table { min-width: 800px; }
+  .sp-login-card { padding: 1.25rem; }
+  pre { font-size: .7rem; }
+}
+
+/* Long, unbreakable content (JSON blocks, badges, pill buttons) should never
+   force the page to scroll horizontally - wrap/scroll it within its own box
+   instead, on every screen size. */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* ===== Inventory Tracker Table & Modal Premium Styles ===== */

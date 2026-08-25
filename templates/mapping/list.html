@@ -1,10 +1,10 @@
 {% extends "base/base.html" %}
 {% block content %}
-<div class="d-flex align-items-center justify-content-between w-100 gap-3 mb-3">
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2 mb-3">
   <div class="d-flex align-items-center gap-2">
     <h4 class="fw-bold mb-0" style="color: var(--sp-navy)"><i class="bi bi-diagram-3-fill me-2"></i>Template Mapping</h4>
   </div>
-  <div class="d-flex align-items-center gap-2 ms-auto">
+  <div class="d-flex align-items-center flex-wrap gap-2">
     <a href="{% url 'mapping:auto_detect' %}" class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-magic me-1"></i> Auto-Detect</a>
     <a href="{% url 'mapping:create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-plus-lg me-1"></i> New Template</a>
     {% if user.profile.is_admin %}

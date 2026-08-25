@@ -1,8 +1,8 @@
 {% extends "base/base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-1">
-  <h4 class="fw-bold" style="color: var(--sp-navy)">Project Insights — {{ project.project_name }}</h4>
-  <a href="{% url 'projects:detail' project.pk %}" class="btn btn-sm btn-outline-secondary">&larr; Back to Dashboard
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-1">
+  <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Project Insights — {{ project.project_name }}</h4>
+  <a href="{% url 'projects:detail' project.pk %}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Back to Dashboard
     View</a>
 </div>
 <br>
@@ -94,43 +94,45 @@
 {% endif %} -->
 
 <div class="row g-3">
-  <div class="sp-panel">
-    <h6>Core Schema</h6>
-    <div class="table-responsive">
-    <table class="table table-sm">
-      <tbody>
-        <tr>
-          <th class="sp-th-narrow">Project Name</th>
-          <td>{{ project.project_name }}</td>
-        </tr>
-        <tr>
-          <th>Branch</th>
-          <td>{{ project.branch.name }} ({{ project.branch.code }})</td>
-        </tr>
-        <tr>
-          <th>Start / End Date</th>
-          <td>{{ project.start_date }} &ndash; {{ project.end_date }}</td>
-        </tr>
-        <tr>
-          <th>Target Records</th>
-          <td>{{ project.target_records }}</td>
-        </tr>
-        <tr>
-          <th>Delivered Records</th>
-          <td>{{ project.delivered_records }}</td>
-        </tr>
-        <tr>
-          <th>Total Images</th>
-          <td>{{ project.total_images }}</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="col-md-6">
+    <div class="sp-panel">
+      <h6>Core Schema</h6>
+      <div class="table-responsive">
+      <table class="table table-sm">
+        <tbody>
+          <tr>
+            <th style="width:220px">Project Name</th>
+            <td>{{ project.project_name }}</td>
+          </tr>
+          <tr>
+            <th>Branch</th>
+            <td>{{ project.branch.name }} ({{ project.branch.code }})</td>
+          </tr>
+          <tr>
+            <th>Start / End Date</th>
+            <td>{{ project.start_date }} &ndash; {{ project.end_date }}</td>
+          </tr>
+          <tr>
+            <th>Target Records</th>
+            <td>{{ project.target_records }}</td>
+          </tr>
+          <tr>
+            <th>Delivered Records</th>
+            <td>{{ project.delivered_records }}</td>
+          </tr>
+          <tr>
+            <th>Total Images</th>
+            <td>{{ project.total_images }}</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
     </div>
   </div>
   <div class="col-md-6">
     <div class="sp-panel">
       <h6>Project Status</h6>
-      {% if project_status.from_excel_formulas %}
+      <!-- {% if project_status.from_excel_formulas %}
       <p class="small text-muted mb-2"><i class="bi bi-file-earmark-excel"></i> Straight from the Project Summary
         sheet's own formulas.</p>
       {% elif not project_status.column_selected %}
@@ -139,8 +141,7 @@
       {% else %}
       <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
         readable — showing your selected Inventory column's sum instead.</p>
-      {% endif %}
-      <div class="table-responsive">
+      {% endif %} -->
       <table class="table table-sm mb-0">
         <tbody>
           <tr>
@@ -177,13 +178,12 @@
           </tr>
         </tbody>
       </table>
-      </div>
     </div>
   </div>
   <div class="col-md-6">
     <div class="sp-panel">
       <h6>Branch Status</h6>
-      {% if branch_status.from_excel_formulas %}
+      <!-- {% if branch_status.from_excel_formulas %}
       <p class="small text-muted mb-2"><i class="bi bi-file-earmark-excel"></i> Straight from the Project Summary
         sheet's own formulas.</p>
       {% elif not branch_status.column_selected %}
@@ -192,8 +192,7 @@
       {% else %}
       <p class="small text-muted mb-2"><i class="bi bi-info-circle"></i> Project Summary sheet cells weren't
         readable — showing your selected Inventory column's sum instead.</p>
-      {% endif %}
-      <div class="table-responsive">
+      {% endif %} -->
       <table class="table table-sm mb-0">
         <tbody>
           <tr>
@@ -222,7 +221,6 @@
           </tr>
         </tbody>
       </table>
-      </div>
     </div>
   </div>
 </div>
