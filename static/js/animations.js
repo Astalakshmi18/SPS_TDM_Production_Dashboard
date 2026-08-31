@@ -38,38 +38,72 @@
     var sidebar = document.querySelector(".sp-sidebar");
     if (!sidebar) return;
 
-    function updateToggleIcons(collapsed) {
-      var btns = document.querySelectorAll(".sp-toggle-btn");
-      btns.forEach(function (btn) {
+    function updateToggleState(collapsed) {
+      var chevronBtns = document.querySelectorAll(".sp-toggle-btn");
+      chevronBtns.forEach(function (btn) {
         var icon = btn.querySelector("i");
         if (icon) {
           if (collapsed) {
-            icon.className = "bi bi-chevron-right";
-            btn.setAttribute("title", "Expand Sidebar");
+            icon.className = "bi bi-chevron-right text-white";
+            btn.setAttribute("title", "Expand Sidebar (Ctrl+B)");
           } else {
-            icon.className = "bi bi-chevron-left";
-            btn.setAttribute("title", "Collapse Sidebar");
+            icon.className = "bi bi-chevron-left text-white";
+            btn.setAttribute("title", "Collapse Sidebar (Ctrl+B)");
           }
         }
       });
+
+      var desktopToggleText = document.getElementById("spDesktopNavToggleText");
+      if (desktopToggleText) {
+        desktopToggleText.textContent = collapsed ? "Show Nav" : "Hide Nav";
+      }
+    }
+
+    function toggleSidebar() {
+      var collapsed = sidebar.classList.toggle("sp-sidebar-collapsed");
+      localStorage.setItem("spSidebarCollapsed", collapsed ? "true" : "false");
+      updateToggleState(collapsed);
     }
 
     // Apply saved state on load
     var isCollapsed = localStorage.getItem("spSidebarCollapsed") === "true";
     if (isCollapsed) {
       sidebar.classList.add("sp-sidebar-collapsed");
-      updateToggleIcons(true);
+      updateToggleState(true);
     }
 
-    // Event delegation on document click for reliable toggle triggering
+    // Event delegation for toggle triggers
     document.addEventListener("click", function (e) {
       var btn = e.target.closest(".sp-toggle-btn");
       if (btn) {
         e.preventDefault();
         e.stopPropagation();
-        var collapsed = sidebar.classList.toggle("sp-sidebar-collapsed");
-        localStorage.setItem("spSidebarCollapsed", collapsed ? "true" : "false");
-        updateToggleIcons(collapsed);
+        toggleSidebar();
+      }
+    });
+
+    // Keyboard shortcut (Ctrl+B or Cmd+B) to toggle navigation bar
+    document.addEventListener("keydown", function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        var activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
+        if (activeTag !== "input" && activeTag !== "textarea" && activeTag !== "select") {
+          e.preventDefault();
+          toggleSidebar();
+        }
+      }
+    });
+
+    // Auto-dismiss mobile offcanvas drawer on nav link click
+    document.addEventListener("click", function (e) {
+      var offcanvasLink = e.target.closest(".sp-offcanvas .nav-link");
+      if (offcanvasLink) {
+        var offcanvasEl = document.getElementById("spSidebarOffcanvas");
+        if (offcanvasEl && typeof bootstrap !== "undefined" && bootstrap.Offcanvas) {
+          var bsOffcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+          if (bsOffcanvas) {
+            bsOffcanvas.hide();
+          }
+        }
       }
     });
   }

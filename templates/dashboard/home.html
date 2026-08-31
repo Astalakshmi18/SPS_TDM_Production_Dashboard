@@ -9,38 +9,38 @@
 </div>
 
 <!-- TOP KPI ROW -->
-<div class="row g-3 mb-3">
-  <div class="col-6 col-lg-2">
+<div class="row g-2 g-md-3 mb-3">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-navy">
       <div class="kpi-label">Total Projects</div>
       <div class="kpi-value" data-kpi="total_projects">{{ kpis.total_projects }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-teal">
       <div class="kpi-label">Target Records</div>
       <div class="kpi-value" data-kpi="target">{{ kpis.target|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-green">
       <div class="kpi-label">Delivered Records</div>
       <div class="kpi-value" data-kpi="delivered">{{ kpis.delivered|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-yellow">
       <div class="kpi-label">Remaining Records</div>
       <div class="kpi-value" data-kpi="remaining">{{ kpis.remaining|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-navy">
       <div class="kpi-label">Delivery %</div>
       <div class="kpi-value" data-kpi="delivery_pct">{{ kpis.delivery_pct }}%</div>
     </div>
   </div>
-  <div class="col-6 col-lg-2">
+  <div class="col-6 col-md-4 col-lg-2">
     <div class="kpi-card kpi-teal">
       <div class="kpi-label">Total Images</div>
       <div class="kpi-value" data-kpi="total_images">{{ kpis.total_images|floatformat:0 }}</div>
@@ -49,26 +49,26 @@
 </div>
 
 <!-- BATCH / KEYING KPI ROW -->
-<div class="row g-3 mb-3">
-  <div class="col-6 col-lg-3">
+<div class="row g-2 g-md-3 mb-3">
+  <div class="col-6 col-md-3">
     <div class="kpi-card kpi-navy" title="Number of files/folders imported from the inventory sheet">
       <div class="kpi-label">Total Batches</div>
       <div class="kpi-value" data-kpi="total_batches">{{ kpis.total_batches|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
+  <div class="col-6 col-md-3">
     <div class="kpi-card kpi-teal" title="Batches with no shipment date recorded yet - still in progress">
       <div class="kpi-label">Batches Being Processed</div>
       <div class="kpi-value" data-kpi="batches_being_keyed">{{ kpis.batches_being_keyed|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
+  <div class="col-6 col-md-3">
     <div class="kpi-card kpi-orange" title="Batches (files/folders) with a shipment date recorded - i.e. shipped out. Counts files, not records - a different unit than Delivered Records above.">
       <div class="kpi-label">Delivered Batches</div>
       <div class="kpi-value" data-kpi="promoted">{{ kpis.promoted|floatformat:0 }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg-3">
+  <div class="col-6 col-md-3">
     <div class="kpi-card kpi-green" title="Promoted batches ÷ Total batches">
       <div class="kpi-label">Delivered Batches %</div>
       <div class="kpi-value" data-kpi="promoted_pct">{{ kpis.promoted_pct }}%</div>
@@ -350,13 +350,12 @@
   </div>
 </div>
 
-<div class="row">
-  <!-- LEFT PANEL: filters -->
-  <div class="col-lg-2 col-md-12 mb-3">
+<div class="row g-3">
+  <!-- LEFT PANEL: filters & status summary -->
+  <div class="col-12 col-md-5 col-lg-2 mb-3">
     <div class="sp-panel">
       <h6>Filters</h6>
       <form method="get">
-        {% if show_branch_filter %}
         <label class="form-label small">Branch</label>
         <select name="branch" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All Branches</option>
@@ -364,17 +363,7 @@
             <option value="{{ b.code }}" {% if selected_branch == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
           {% endfor %}
         </select>
-        {% endif %}
 
-        <!-- <label class="form-label small">Vendor</label>
-        <select name="vendor" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
-          <option value="">All Vendors</option>
-          {% for v in vendors %}
-            <option value="{{ v }}" {% if selected_vendor == v %}selected{% endif %}>{{ v }}</option>
-          {% endfor %}
-        </select> -->
-
-        {% if show_project_filter %}
         <label class="form-label small">Project</label>
         <select name="project" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">All Projects</option>
@@ -382,30 +371,31 @@
             <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
           {% endfor %}
         </select>
-        {% endif %}
       </form>
     </div>
 
     <div class="sp-panel">
       <h6>Status / Project Count</h6>
-      <table class="table table-sm mb-0">
-        <tbody>
-          {% for m in milestone_summary %}
-          <tr>
-            <td><span class="status-dot status-{{ m.key }}"></span>{{ m.label }}</td>
-            <td class="text-end fw-semibold">{{ m.count }}</td>
-          </tr>
-          {% empty %}
-          <tr><td class="text-muted">No projects yet</td><td></td></tr>
-          {% endfor %}
-          <tr class="border-top"><td class="fw-bold">Total</td><td class="text-end fw-bold">{{ milestone_total }}</td></tr>
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table table-sm mb-0">
+          <tbody>
+            {% for m in milestone_summary %}
+            <tr>
+              <td><span class="status-dot status-{{ m.key }}"></span>{{ m.label }}</td>
+              <td class="text-end fw-semibold">{{ m.count }}</td>
+            </tr>
+            {% empty %}
+            <tr><td class="text-muted" colspan="2">No projects yet</td></tr>
+            {% endfor %}
+            <tr class="border-top"><td class="fw-bold">Total</td><td class="text-end fw-bold">{{ milestone_total }}</td></tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
-  <!-- CENTER: progress + milestones -->
-  <div class="col-lg-7 col-md-12 mb-3">
+  <!-- CENTER: progress + branch chart -->
+  <div class="col-12 col-md-7 col-lg-7 mb-3">
     <div class="sp-panel">
       <h6>Delivery &amp; Timeline Progress</h6>
       {% for p in projects %}
@@ -425,19 +415,31 @@
 
     <div class="sp-panel">
       <h6>Branch-wise Target vs Delivered</h6>
-      <canvas id="branchChart" height="110"></canvas>
+      <div class="sp-chart-container" style="position: relative; height: 180px; width: 100%;">
+        <canvas id="branchChart"></canvas>
+      </div>
     </div>
   </div>
 
   <!-- RIGHT: completion doughnut + status -->
-  <div class="col-lg-3 col-md-12">
-    <div class="sp-panel">
-      <h6>Overall Completion</h6>
-      <canvas id="completionChart" height="200"></canvas>
-    </div>
-    <div class="sp-panel">
-      <h6>Status Breakdown</h6>
-      <canvas id="statusChart" height="200"></canvas>
+  <div class="col-12 col-md-12 col-lg-3">
+    <div class="row g-3">
+      <div class="col-12 col-sm-6 col-lg-12">
+        <div class="sp-panel">
+          <h6>Overall Completion</h6>
+          <div class="sp-chart-container" style="position: relative; height: 170px; width: 100%;">
+            <canvas id="completionChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-sm-6 col-lg-12">
+        <div class="sp-panel">
+          <h6>Status Breakdown</h6>
+          <div class="sp-chart-container" style="position: relative; height: 170px; width: 100%;">
+            <canvas id="statusChart"></canvas>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -454,20 +456,20 @@ window.branchChart = new Chart(document.getElementById('branchChart'), {
     { label: 'Target', data: branchData.target, backgroundColor: '#0b1f3a' },
     { label: 'Delivered', data: branchData.delivered, backgroundColor: '#14b8a6' },
   ]},
-  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
 });
 
 window.completionChart = new Chart(document.getElementById('completionChart'), {
   type: 'doughnut',
   data: { labels: ['Delivered', 'Remaining'], datasets: [{ data: [completionData.delivered, completionData.remaining],
     backgroundColor: ['#22c55e', '#e5e9f2'] }] },
-  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
 });
 
 window.statusChart = new Chart(document.getElementById('statusChart'), {
   type: 'doughnut',
   data: { labels: statusData.labels, datasets: [{ data: statusData.values, backgroundColor: statusData.colors }] },
-  options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
 });
 
 // Project Detail Table: enable Bootstrap tooltips on milestone/info icons,

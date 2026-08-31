@@ -8,7 +8,7 @@
 </div>
 <div class="row g-3">
   {% for b in branches %}
-  <div class="col-md-3">
+  <div class="col-12 col-sm-6 col-md-4 col-lg-3">
     <div class="sp-panel text-center">
       <div class="fs-3 fw-bold" style="color: var(--sp-teal)">{{ b.code }}</div>
       <div>{{ b.name }}</div>
@@ -16,9 +16,9 @@
       {% if not b.is_active %}<span class="badge bg-secondary mt-1">Inactive</span>{% endif %}
       {% if user.profile.is_admin %}
       <div class="mt-2">
-        <a href="{% url 'branches:access' b.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-people"></i></a>
-        <a href="{% url 'branches:edit' b.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-        <a href="{% url 'branches:delete' b.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+        <a href="{% url 'branches:access' b.pk %}" class="btn btn-sm btn-outline-primary" title="Branch Access"><i class="bi bi-people"></i></a>
+        <a href="{% url 'branches:edit' b.pk %}" class="btn btn-sm btn-outline-secondary" title="Edit"><i class="bi bi-pencil"></i></a>
+        <a href="{% url 'branches:delete' b.pk %}" class="btn btn-sm btn-outline-danger" title="Delete"><i class="bi bi-trash"></i></a>
       </div>
       {% endif %}
     </div>

@@ -14,34 +14,31 @@
 </head>
 <body>
 {% if user.is_authenticated %}
-<div class="d-flex">
+<div class="sp-app-layout d-flex flex-column flex-lg-row min-vh-100 w-100">
 
-  <!-- Mobile top bar -->
-  <div class="sp-mobile-topbar d-lg-none">
-    <button class="sp-hamburger" type="button" data-bs-toggle="offcanvas" data-bs-target="#spSidebarOffcanvas">
+  <!-- Mobile/Tablet Top Navigation Bar -->
+  <header class="sp-mobile-topbar d-lg-none">
+    <button class="sp-hamburger" type="button" data-bs-toggle="offcanvas" data-bs-target="#spSidebarOffcanvas" aria-controls="spSidebarOffcanvas" aria-label="Toggle navigation">
       <i class="bi bi-list"></i>
     </button>
-    <span class="sp-brand-mobile"><span class="sp-logo-chip"><img src="{% static 'img/logo.png' %}" alt="Swift Prosys" class="sp-logo-img"></span></span>
-  </div>
+    <span class="sp-brand-mobile">
+      <span class="sp-logo-chip"><img src="{% static 'img/logo.png' %}" alt="Swift Prosys" class="sp-logo-img"></span>
+    </span>
+  </header>
 
-  <!-- Desktop sidebar -->
-  <nav class="sp-sidebar d-none d-lg-flex">
-    {% include "base/_sidebar_content.html" %}
+  <!-- Desktop Sidebar -->
+  <nav class="sp-sidebar d-none d-lg-flex" aria-label="Sidebar navigation">
+    {% include "base/_sidebar_content.html" with is_offcanvas=False %}
   </nav>
 
-  <!-- Mobile offcanvas sidebar -->
-  <div class="offcanvas offcanvas-start sp-offcanvas d-lg-none" tabindex="-1" id="spSidebarOffcanvas">
-    <div class="offcanvas-body p-0">
-      {% include "base/_sidebar_content.html" %}
-    </div>
-  </div>
-
+  <!-- Main Application Content -->
   <main class="sp-content">
+
     {% if messages %}
       {% for message in messages %}
         <div class="alert alert-{{ message.tags }} sp-alert alert-dismissible fade show" role="alert">
           {{ message }}
-          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
       {% endfor %}
     {% endif %}
@@ -49,6 +46,19 @@
       {% block content %}{% endblock %}
     </div>
   </main>
+</div>
+
+<!-- Mobile/Tablet Offcanvas Sidebar Drawer (fixed overlay outside document flex flow) -->
+<div class="offcanvas offcanvas-start sp-offcanvas d-lg-none" tabindex="-1" id="spSidebarOffcanvas" aria-labelledby="spSidebarOffcanvasLabel">
+  <div class="offcanvas-header d-flex align-items-center justify-content-between pb-0 pt-3 px-3">
+    <span class="sp-brand-mobile" id="spSidebarOffcanvasLabel">
+      <span class="sp-logo-chip"><img src="{% static 'img/logo.png' %}" alt="Swift Prosys" class="sp-logo-img"></span>
+    </span>
+    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+  </div>
+  <div class="offcanvas-body px-3 pt-2 pb-3 d-flex flex-column">
+    {% include "base/_sidebar_content.html" with is_offcanvas=True %}
+  </div>
 </div>
 {% else %}
 {% block auth_content %}{% endblock %}

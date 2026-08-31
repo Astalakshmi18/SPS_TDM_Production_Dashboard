@@ -9,7 +9,7 @@
       <span class="badge bg-primary px-2 py-1 fs-6 fw-semibold">{{ selected_project.project_name }}</span>
     {% endif %}
   </div>
-  {% if selected_project and request.user.profile.can_edit_projects %}
+  {% if selected_project %}
     <button type="button" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap" onclick="spOpenColumnsModal(event)" data-bs-toggle="modal" data-bs-target="#columnsModal">
       <i class="bi bi-sliders me-1"></i> Customize Columns
     </button>
@@ -57,28 +57,28 @@
 <div class="sp-panel">
   <form method="get" class="row g-2 align-items-center mb-3">
     <input type="hidden" name="project" value="{{ selected_project.pk }}">
-    <div class="col-md-4">
+    <div class="col-12 col-md-4">
       <div class="input-group input-group-sm">
         <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
         <input name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search file or folder name...">
       </div>
     </div>
-    <div class="col-md-3">
+    <div class="col-12 col-sm-6 col-md-3">
       <input type="text" class="form-control form-control-sm bg-light text-secondary fw-semibold" value="{{ selected_project.project_name }}" disabled>
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-sm-3 col-md-2">
       <select name="event_type" class="form-select form-select-sm">
         <option value="">All Event Types</option>
         {% for e in event_types %}<option value="{{ e }}" {% if selected_event_type == e %}selected{% endif %}>{{ e }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-sm-3 col-md-2">
       <select name="language" class="form-select form-select-sm">
         <option value="">All Languages</option>
         {% for l in languages %}<option value="{{ l }}" {% if selected_language == l %}selected{% endif %}>{{ l }}</option>{% endfor %}
       </select>
     </div>
-    <div class="col-md-1">
+    <div class="col-12 col-md-1">
       <button class="btn btn-outline-primary btn-sm w-100 fw-semibold">Filter</button>
     </div>
   </form>
@@ -144,7 +144,7 @@
 </div>
 
 <!-- Modal Dialog for Column Customization -->
-{% if selected_project and request.user.profile.can_edit_projects %}
+{% if selected_project %}
 <div class="modal fade" id="columnsModal" tabindex="-1" aria-labelledby="columnsModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable">
     <div class="modal-content shadow-lg border-0">

@@ -23,23 +23,26 @@
   --sp-ms-missed: #dc2626;
 }
 
-* { box-sizing: border-box; }
+*, *::before, *::after { box-sizing: border-box; }
 
 html, body {
   width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
 }
 
 body {
   background: var(--sp-bg);
-  font-family: "Manrope", "Segoe UI", Arial, sans-serif;
+  font-family: "Manrope", "Segoe UI", -apple-system, BlinkMacSystemFont, Arial, sans-serif;
   position: relative;
   min-height: 100vh;
-  overflow-x: hidden;
   font-size: 0.82rem;
   line-height: 1.45;
   color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 /* Headings base refinement */
@@ -54,20 +57,30 @@ h4.fw-bold { font-size: 1.12rem; }
 /* Global Form Controls & Buttons font sizing */
 .form-control, .form-select, select, input {
   font-size: 0.78rem !important;
-  padding: 0.32rem 0.6rem !important;
+  padding: 0.35rem 0.65rem !important;
   border-radius: 7px !important;
+  min-height: 34px;
 }
 .btn {
   font-size: 0.78rem;
-  padding: 0.32rem 0.7rem;
+  padding: 0.35rem 0.75rem;
   border-radius: 7px;
   transition: transform .15s ease, box-shadow .15s ease;
+  touch-action: manipulation;
 }
 .btn:active { transform: scale(.97); }
 .btn-sm {
-  font-size: 0.72rem;
-  padding: 0.22rem 0.5rem;
+  font-size: 0.74rem;
+  padding: 0.25rem 0.55rem;
   border-radius: 6px;
+}
+
+/* App layout wrapper */
+.sp-app-layout {
+  min-height: 100vh;
+  width: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* ===== Animated gradient-mesh background (login page only) ===== */
@@ -102,54 +115,98 @@ h4.fw-bold { font-size: 1.12rem; }
 }
 
 /* Page content area */
-.sp-content, .sp-sidebar, .offcanvas.sp-offcanvas { position: relative; z-index: 1; }
-
 .sp-content {
   flex: 1 1 0%;
   min-width: 0;
   width: 100%;
   padding: 1.15rem 1.4rem;
+  position: relative;
+  z-index: 1;
 }
 
-/* ===== Fixed Sidebar ===== */
-.sp-sidebar {
-  width: 230px;
-  height: 100vh;
-  max-height: 100vh;
-  position: sticky;
-  top: 0;
-  align-self: flex-start;
-  flex-shrink: 0;
-  overflow-y: auto;
-  background: linear-gradient(180deg, var(--sp-navy) 0%, var(--sp-navy-2) 100%);
-  color: #dbe4f3;
-  padding: 1rem 0.85rem;
-  flex-direction: column;
-  box-shadow: 4px 0 24px rgba(0,0,0,.15);
-  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease;
+/* ===== Desktop Fixed Sidebar (Never scrolls with page) ===== */
+@media (min-width: 992px) {
+  .sp-sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: 230px !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+    background: linear-gradient(180deg, var(--sp-navy) 0%, var(--sp-navy-2) 100%) !important;
+    color: #dbe4f3;
+    padding: 1rem 0.85rem !important;
+    box-shadow: 4px 0 24px rgba(0,0,0,.15);
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), padding 0.25s ease, transform 0.25s ease;
+    z-index: 1030 !important;
+  }
+
+  .sp-content {
+    margin-left: 230px !important;
+    width: calc(100% - 230px) !important;
+    min-width: 0;
+    transition: margin-left 0.25s cubic-bezier(0.4, 0, 0.2, 1), width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Small / Collapsed Sidebar State (Mini-icon bar 68px) */
+  .sp-sidebar.sp-sidebar-collapsed {
+    width: 68px !important;
+    min-width: 68px !important;
+    padding: 1rem 0.35rem !important;
+  }
+  .sp-sidebar.sp-sidebar-collapsed ~ .sp-content {
+    margin-left: 68px !important;
+    width: calc(100% - 68px) !important;
+  }
+
+  /* Completely Hidden Sidebar State */
+  .sp-sidebar.sp-sidebar-hidden {
+    transform: translateX(-100%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+  .sp-sidebar.sp-sidebar-hidden ~ .sp-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
 }
-.sp-sidebar::-webkit-scrollbar {
+
+/* Dedicated Scroll Container for Sidebar Navigation Items */
+.sp-sidebar-nav {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  padding-right: 2px;
+}
+.sp-sidebar-nav::-webkit-scrollbar {
   width: 4px;
 }
-.sp-sidebar::-webkit-scrollbar-track {
+.sp-sidebar-nav::-webkit-scrollbar-track {
   background: transparent;
 }
-.sp-sidebar::-webkit-scrollbar-thumb {
+.sp-sidebar-nav::-webkit-scrollbar-thumb {
   background: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
 }
-.sp-sidebar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.4);
+.sp-sidebar-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
 }
+
 .sp-brand, .sp-brand-mobile { font-size: 1.05rem; font-weight: 800; color: #fff; display: flex; gap: .45rem; align-items: center; letter-spacing: -.01em; }
 .sp-brand i, .sp-brand-mobile i { color: var(--sp-blue); }
 
 .sp-toggle-btn {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 6px;
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -159,17 +216,12 @@ h4.fw-bold { font-size: 1.12rem; }
   z-index: 10;
 }
 .sp-toggle-btn:hover {
-  background: rgba(41, 170, 225, 0.3);
+  background: rgba(41, 170, 225, 0.4);
   color: #fff;
+  transform: scale(1.05);
 }
 
-/* Small / Collapsed Sidebar State */
-.sp-sidebar.sp-sidebar-collapsed {
-  width: 68px !important;
-  min-width: 68px !important;
-  padding: 1rem 0.35rem !important;
-  overflow-x: hidden !important;
-}
+/* Small / Collapsed Sidebar Styles */
 .sp-sidebar.sp-sidebar-collapsed .sp-brand {
   flex-direction: column;
   gap: 0.4rem;
@@ -213,11 +265,28 @@ h4.fw-bold { font-size: 1.12rem; }
 .sp-sidebar.sp-sidebar-collapsed .sp-logout-text {
   display: none !important;
 }
+.sp-sidebar.sp-sidebar-collapsed .sp-logout-icon {
+  display: inline-block !important;
+}
 .sp-sidebar.sp-sidebar-collapsed .sp-logout-btn {
   padding: 0.35rem 0;
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+/* Desktop Floating Navigation Toggle */
+.sp-sidebar-floating-toggle {
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+.sp-sidebar-floating-toggle:hover {
+  background: var(--sp-navy);
+  color: #fff !important;
+  border-color: var(--sp-navy);
+}
+.sp-sidebar-floating-toggle:hover i {
+  color: #fff !important;
 }
 
 .sp-logo-chip {
@@ -495,15 +564,48 @@ h4.fw-bold { font-size: 1.12rem; }
 .sp-ms-dot:focus-visible { outline: 2px solid var(--sp-navy); outline-offset: 2px; }
 
 /* Scroll container for tables */
-.sp-table-scroll {
-  width: 100%; overflow-x: auto; overflow-y: visible;
-  border-radius: 10px; border: 1px solid rgba(11,31,58,.08);
+.sp-table-scroll, .table-responsive {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 10px;
   background: #fff;
+  position: relative;
+}
+.sp-table-scroll {
+  border: 1px solid rgba(11,31,58,.08);
 }
 .sp-table-scroll:focus-visible { outline: 2px solid var(--sp-blue); outline-offset: -2px; }
 
+/* Clean Webkit Custom Scrollbar */
+.sp-table-scroll::-webkit-scrollbar,
+.table-responsive::-webkit-scrollbar,
+.sp-tabs-scroll::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+.sp-table-scroll::-webkit-scrollbar-track,
+.table-responsive::-webkit-scrollbar-track,
+.sp-tabs-scroll::-webkit-scrollbar-track {
+  background: rgba(11, 31, 58, 0.04);
+  border-radius: 6px;
+}
+.sp-table-scroll::-webkit-scrollbar-thumb,
+.table-responsive::-webkit-scrollbar-thumb,
+.sp-tabs-scroll::-webkit-scrollbar-thumb {
+  background: rgba(41, 170, 225, 0.4);
+  border-radius: 6px;
+}
+.sp-table-scroll::-webkit-scrollbar-thumb:hover,
+.table-responsive::-webkit-scrollbar-thumb:hover,
+.sp-tabs-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(41, 170, 225, 0.7);
+}
+
 /* Table shell */
-.sp-modern-table { margin-bottom: 0; min-width: 1300px; }
+.sp-modern-table { margin-bottom: 0; min-width: 1280px; }
 .sp-modern-table > :not(caption) > * > * { background: transparent; }
 
 /* Grouped header row */
@@ -521,14 +623,6 @@ h4.fw-bold { font-size: 1.12rem; }
   background: #f4f7fb; color: var(--sp-navy); font-weight: 700; font-size: .72rem;
   padding: .5rem .6rem; white-space: nowrap; border-bottom: 2px solid rgba(11,31,58,.1);
   vertical-align: middle;
-}
-
-.sp-modern-table thead th { position: sticky; z-index: 3; }
-.sp-modern-table thead tr:first-child th { top: 0; z-index: 4; }
-.sp-modern-table thead tr:last-child th { top: 26px; }
-@media (max-width: 991.98px) {
-  .sp-modern-table thead tr:first-child th { top: 48px; }
-  .sp-modern-table thead tr:last-child th { top: 74px; }
 }
 
 /* Body cells */
@@ -576,89 +670,76 @@ h4.fw-bold { font-size: 1.12rem; }
 .sp-info-btn:hover { background: var(--sp-navy); color: #fff; border-color: var(--sp-navy); transform: translateY(-1px); }
 .sp-info-btn:focus-visible { outline: 2px solid var(--sp-blue); outline-offset: 2px; }
 
-/* ==========================================================================
-   RESPONSIVE BREAKPOINTS (Ultrawide, Monitor, Laptop, Tablet, Mobile)
-   ========================================================================== */
-
-/* Ultrawide & High-Res Monitors (>= 1600px) */
-@media (min-width: 1600px) {
-  .sp-sidebar { width: 240px; padding: 1.15rem 1rem; }
-  .sp-content { padding: 1.25rem 1.75rem; }
+/* ===== Milestone Track on Detail View ===== */
+.sp-milestone-container {
+  position: relative;
+  width: 100%;
+}
+.milestone-track {
+  position: relative;
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  margin: 1.5rem 0.5rem 1rem;
+}
+.milestone-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: var(--sp-navy);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+.milestone-point {
+  position: absolute;
+  top: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #cbd5e1;
+  transform: translateX(-50%);
+  z-index: 2;
+}
+.milestone-point.status-met, .milestone-point.status-green, .milestone-point.status-completed {
+  border-color: var(--sp-green); background: var(--sp-green);
+}
+.milestone-point.status-ontrack, .milestone-point.status-blue {
+  border-color: var(--sp-blue); background: var(--sp-blue);
+}
+.milestone-point.status-atrisk, .milestone-point.status-yellow {
+  border-color: var(--sp-yellow); background: var(--sp-yellow);
+}
+.milestone-point.status-missed, .milestone-point.status-red {
+  border-color: var(--sp-red); background: var(--sp-red);
 }
 
-/* Standard Desktop Monitors (1200px to 1599.98px) */
-@media (min-width: 1200px) and (max-width: 1599.98px) {
-  .sp-sidebar { width: 220px; padding: 1rem .75rem; }
-  .sp-content { padding: 1.1rem 1.35rem; }
+/* ===== Scrollable Tabs for Mobile / Tablet ===== */
+.sp-tabs-scroll {
+  flex-wrap: nowrap !important;
+  overflow-x: auto !important;
+  -webkit-overflow-scrolling: touch;
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 0;
 }
-
-/* Laptops & Compact Display Resolution (992px to 1199.98px) */
-@media (min-width: 992px) and (max-width: 1199.98px) {
-  .sp-sidebar { width: 195px; padding: .85rem .6rem; }
-  .sp-sidebar .nav-link { font-size: .76rem; padding: .4rem .6rem; }
-  .sp-sidebar .nav-link i { width: 16px; margin-right: .35rem; font-size: .82rem; }
-  .sp-brand { font-size: .95rem; }
-  .sp-logo-img { height: 22px; }
-  .sp-content { padding: .9rem 1.1rem; }
-  .kpi-card { padding: .65rem .85rem; }
-  .kpi-card .kpi-value { font-size: 1.2rem; }
-  .kpi-card .kpi-label { font-size: .62rem; }
-  .sp-panel { padding: .85rem 1rem; }
-  .sp-modern-table tbody td { font-size: .7rem; padding: .4rem .5rem; }
-  .sp-modern-table thead tr:last-child th { font-size: .68rem; padding: .45rem .5rem; }
+.sp-tabs-scroll .nav-item {
+  flex-shrink: 0;
 }
-
-/* Tablets & Split Windows (768px to 991.98px) */
-@media (max-width: 991.98px) {
-  .sp-content { padding: .85rem 1rem; }
-  .sp-panel h6 { font-size: .84rem; }
-  canvas { max-width: 100%; }
-  
-  .col-lg-2 { width: 100%; }
-  .col-lg-7 { width: 100%; }
-  .col-lg-3 { width: 100%; }
-  .col-6.col-lg-2 { width: 33.333%; }
+.sp-tabs-scroll .nav-link {
+  white-space: nowrap;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.5rem 0.9rem;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #64748b;
+  border-radius: 0;
 }
-
-/* Mobile Screens (576px to 767.98px) */
-@media (max-width: 767.98px) {
-  .kpi-card { padding: .65rem .8rem; }
-  .kpi-card .kpi-value { font-size: 1.1rem; }
-  .kpi-card .kpi-label { font-size: .6rem; }
-  .sp-panel { padding: .75rem .85rem; border-radius: 10px; }
-  .sp-content { padding: .65rem .75rem; }
-  h4.fw-bold { font-size: 1.05rem; }
-  .table { font-size: .7rem; }
-  .ms-cell { padding: .15rem .4rem; font-size: .65rem; }
-  .sp-logo-img { height: 22px; }
-  .sp-login-card { padding: 1.5rem; }
-  .sp-login-logo .sp-logo-img { height: 38px; }
-  
-  .col-6.col-lg-2 { width: 50%; }
-  .sp-panel select { width: 100%; }
-}
-
-/* Extra Small Screens (< 576px) */
-@media (max-width: 575.98px) {
-  .kpi-card .kpi-value { font-size: 1rem; }
-  .d-flex.justify-content-between.align-items-center.mb-3 { flex-wrap: wrap; gap: .4rem; }
-  .col-6.col-lg-2 { width: 100%; }
-  .sp-content { padding: .5rem; }
-  .sp-panel { padding: .65rem; }
-  .sp-panel h6 { font-size: .8rem; }
-  .sp-modern-table { min-width: 800px; }
-  .sp-login-card { padding: 1.25rem; }
-  pre { font-size: .7rem; }
-}
-
-/* Long, unbreakable content (JSON blocks, badges, pill buttons) should never
-   force the page to scroll horizontally - wrap/scroll it within its own box
-   instead, on every screen size. */
-pre {
-  max-width: 100%;
-  overflow-x: auto;
-  white-space: pre-wrap;
-  word-break: break-word;
+.sp-tabs-scroll .nav-link.active {
+  color: var(--sp-navy);
+  background: transparent;
+  border-bottom-color: var(--sp-blue);
 }
 
 /* ===== Inventory Tracker Table & Modal Premium Styles ===== */
@@ -667,6 +748,7 @@ pre {
   border-spacing: 0;
   border-radius: 10px;
   overflow: hidden;
+  width: 100%;
 }
 .sp-inventory-table thead th {
   background: linear-gradient(135deg, var(--sp-navy), var(--sp-navy-2)) !important;
@@ -726,6 +808,15 @@ pre {
 .modal {
   z-index: 1060 !important;
 }
+.modal-dialog {
+  max-width: 600px;
+}
+@media (max-width: 575.98px) {
+  .modal-dialog {
+    margin: 0.5rem auto;
+    max-width: calc(100% - 1rem);
+  }
+}
 .sp-col-item {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
@@ -743,4 +834,100 @@ pre {
 .sp-col-item .form-check-input:checked {
   background-color: var(--sp-blue);
   border-color: var(--sp-blue);
+}
+
+/* Long, unbreakable content should wrap within box */
+pre {
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ==========================================================================
+   RESPONSIVE BREAKPOINTS (Ultrawide, Monitor, Laptop, Tablet, Mobile)
+   ========================================================================== */
+
+/* Ultrawide & High-Res Monitors (>= 1600px) */
+@media (min-width: 1600px) {
+  .sp-sidebar { width: 240px !important; padding: 1.15rem 1rem !important; }
+  .sp-content { margin-left: 240px !important; width: calc(100% - 240px) !important; padding: 1.25rem 1.75rem; }
+}
+
+/* Standard Desktop Monitors (1200px to 1599.98px) */
+@media (min-width: 1200px) and (max-width: 1599.98px) {
+  .sp-sidebar { width: 220px !important; padding: 1rem .75rem !important; }
+  .sp-content { margin-left: 220px !important; width: calc(100% - 220px) !important; padding: 1.1rem 1.35rem; }
+}
+
+/* Laptops & Landscape Tablets (992px to 1199.98px) */
+@media (min-width: 992px) and (max-width: 1199.98px) {
+  .sp-sidebar { width: 195px !important; padding: .85rem .6rem !important; }
+  .sp-sidebar .nav-link { font-size: .76rem; padding: .4rem .6rem; }
+  .sp-sidebar .nav-link i { width: 16px; margin-right: .35rem; font-size: .82rem; }
+  .sp-brand { font-size: .95rem; }
+  .sp-logo-img { height: 22px; }
+  .sp-content { margin-left: 195px !important; width: calc(100% - 195px) !important; padding: .9rem 1.1rem; }
+  .kpi-card { padding: .65rem .85rem; }
+  .kpi-card .kpi-value { font-size: 1.2rem; }
+  .kpi-card .kpi-label { font-size: .62rem; }
+  .sp-panel { padding: .85rem 1rem; }
+  .sp-modern-table tbody td { font-size: .7rem; padding: .4rem .5rem; }
+  .sp-modern-table thead tr:last-child th { font-size: .68rem; padding: .45rem .5rem; }
+}
+
+/* Tablets in Portrait Mode (768px to 991.98px) */
+@media (min-width: 768px) and (max-width: 991.98px) {
+  .sp-content { margin-left: 0 !important; width: 100% !important; padding: 0.85rem 1.1rem; }
+  .sp-panel { padding: 0.85rem 1rem; }
+  .sp-panel h6 { font-size: 0.85rem; }
+  .kpi-card { padding: 0.7rem 0.85rem; min-height: 70px; }
+  .kpi-card .kpi-value { font-size: 1.22rem; }
+  .kpi-card .kpi-label { font-size: 0.64rem; }
+  .table { font-size: 0.76rem; }
+}
+
+/* Large Mobiles & Phablets (576px to 767.98px) */
+@media (min-width: 576px) and (max-width: 767.98px) {
+  .sp-content { padding: 0.75rem 0.85rem; }
+  .sp-panel { padding: 0.8rem 0.9rem; border-radius: 10px; }
+  .sp-panel h6 { font-size: 0.84rem; }
+  .kpi-card { padding: 0.65rem 0.8rem; min-height: 68px; }
+  .kpi-card .kpi-value { font-size: 1.15rem; }
+  .kpi-card .kpi-label { font-size: 0.62rem; }
+  h4.fw-bold { font-size: 1.05rem; }
+  .table { font-size: 0.74rem; }
+  .ms-cell { padding: .15rem .4rem; font-size: .65rem; }
+}
+
+/* Standard Mobile Phones (< 576px) */
+@media (max-width: 575.98px) {
+  .sp-content { padding: 0.6rem 0.65rem; }
+  .sp-panel { padding: 0.75rem 0.8rem; border-radius: 10px; margin-bottom: 0.75rem; }
+  .sp-panel h6 { font-size: 0.82rem; margin-bottom: 0.6rem; }
+  .kpi-card { padding: 0.6rem 0.75rem; min-height: 64px; border-radius: 10px; }
+  .kpi-card .kpi-value { font-size: 1.1rem; }
+  .kpi-card .kpi-label { font-size: 0.6rem; }
+  h4.fw-bold { font-size: 1rem; }
+  .table { font-size: 0.72rem; }
+  .ms-cell { padding: .12rem .35rem; font-size: .62rem; }
+  .sp-pdt-header { gap: 0.5rem; margin-bottom: 0.6rem; padding-bottom: 0.6rem; }
+  .sp-pdt-title { font-size: 0.95rem; }
+  .sp-ms-legend5 { padding: 0.4rem 0.5rem; gap: 0.3rem 0.5rem; }
+  .sp-ms-legend5-item { font-size: 0.65rem; }
+  .sp-login-card { padding: 1.5rem 1.25rem; border-radius: 14px; }
+  .sp-login-logo .sp-logo-img { height: 38px; }
+  .sp-mobile-topbar { padding: 0.45rem 0.75rem; }
+  .sp-brand-mobile .sp-logo-img { height: 18px; }
+}
+
+/* Small / Compact Mobile Phones (<= 375px e.g. iPhone SE) */
+@media (max-width: 375px) {
+  .sp-content { padding: 0.5rem 0.5rem; }
+  .sp-panel { padding: 0.65rem 0.65rem; }
+  .kpi-card { padding: 0.5rem 0.6rem; min-height: 60px; }
+  .kpi-card .kpi-value { font-size: 1rem; }
+  .kpi-card .kpi-label { font-size: 0.56rem; }
+  .btn { font-size: 0.72rem; padding: 0.3rem 0.55rem; }
+  .btn-sm { font-size: 0.68rem; padding: 0.2rem 0.45rem; }
 }

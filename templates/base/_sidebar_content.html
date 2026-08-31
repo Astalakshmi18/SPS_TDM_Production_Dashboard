@@ -1,78 +1,92 @@
 {% load static %}
-<div class="sp-brand justify-content-between w-100">
+{% if not is_offcanvas %}
+<div class="sp-brand mb-2 d-flex align-items-center justify-content-between">
   <span class="sp-logo-chip">
     <img src="{% static 'img/logo.png' %}" alt="Swift Prosys" class="sp-logo-img sp-logo-full">
-    <img src="{% static 'img/logo_min.png' %}" alt="Swift Prosys" class="sp-logo-img sp-logo-min">
+    <img src="{% static 'img/favicon.ico' %}" alt="Swift Prosys" class="sp-logo-min" style="display:none; width: 22px; height: 22px;">
   </span>
-  <button type="button" class="btn btn-sm text-light p-1 sp-toggle-btn d-none d-lg-inline-flex" onclick="spToggleSidebar(event)" title="Toggle Sidebar" aria-label="Toggle Sidebar">
-    <i class="bi bi-chevron-left"></i>
+  <button class="sp-toggle-btn border-0" type="button" title="Hide/Collapse Navigation Bar" aria-label="Toggle Navigation Bar">
+    <i class="bi bi-chevron-left text-white"></i>
   </button>
 </div>
-<ul class="nav flex-column mt-3">
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.view_name == 'dashboard:home' %}active{% endif %}" href="{% url 'dashboard:home' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Production Dashboard">
-      <i class="bi bi-speedometer2"></i>
-      <span class="sp-nav-text">Production Dashboard</span>
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.app_name == 'inventory' %}active{% endif %}" href="{% url 'inventory:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Inventory Tracker">
-      <i class="bi bi-boxes"></i>
-      <span class="sp-nav-text">Inventory Tracker</span>
-    </a>
-  </li>
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.url_name == 'list' and request.resolver_match.app_name == 'projects' %}active{% endif %}" href="{% url 'projects:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Projects">
-      <i class="bi bi-kanban"></i>
-      <span class="sp-nav-text">Projects</span>
-    </a>
-  </li>
-  {% if user.profile.can_create_projects %}
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.url_name == 'upload' %}active{% endif %}" href="{% url 'projects:upload' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Import Data">
-      <i class="bi bi-upload"></i>
-      <span class="sp-nav-text">Import Data</span>
-    </a>
-  </li>
-  {% endif %}
-  {% if user.profile.can_manage_templates %}
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.app_name == 'mapping' %}active{% endif %}" href="{% url 'mapping:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Template Mapping">
-      <i class="bi bi-diagram-3"></i>
-      <span class="sp-nav-text">Template Mapping</span>
-    </a>
-  </li>
-  {% endif %}
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.app_name == 'branches' %}active{% endif %}" href="{% url 'branches:list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Branches">
-      <i class="bi bi-diagram-2"></i>
-      <span class="sp-nav-text">Branches</span>
-    </a>
-  </li>
-  {% if user.profile.is_admin %}
-  <li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'accounts:user_list' %}" data-bs-toggle="tooltip" data-bs-placement="right" title="Users">
-      <i class="bi bi-people"></i>
-      <span class="sp-nav-text">Users</span>
-    </a>
-  </li>
-  {% endif %}
-</ul>
-<div class="sp-user">
+{% endif %}
+
+<div class="sp-sidebar-nav flex-grow-1 overflow-y-auto overflow-x-hidden my-2">
+  <ul class="nav flex-column">
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.view_name == 'dashboard:home' %}active{% endif %}" href="{% url 'dashboard:home' %}" title="Production Dashboard">
+        <i class="bi bi-speedometer2"></i>
+        <span class="sp-nav-text">Production Dashboard</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.app_name == 'inventory' %}active{% endif %}" href="{% url 'inventory:list' %}" title="Inventory Tracker">
+        <i class="bi bi-boxes"></i>
+        <span class="sp-nav-text">Inventory Tracker</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.app_name == 'projects' and request.resolver_match.url_name == 'list' %}active{% endif %}" href="{% url 'projects:list' %}" title="Projects">
+        <i class="bi bi-kanban"></i>
+        <span class="sp-nav-text">Projects</span>
+      </a>
+    </li>
+    <!-- {% comment %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.app_name == 'variance' %}active{% endif %}" href="{% url 'variance:dashboard' %}" title="Plan vs Actual">
+        <i class="bi bi-graph-down-arrow"></i>
+        <span class="sp-nav-text">Plan vs Actual</span>
+      </a>
+    </li>
+    {% endcomment %} -->
+    {% if user.profile.can_create_projects %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.url_name == 'upload' %}active{% endif %}" href="{% url 'projects:upload' %}" title="Import Data">
+        <i class="bi bi-upload"></i>
+        <span class="sp-nav-text">Import Data</span>
+      </a>
+    </li>
+    {% endif %}
+    {% if user.profile.can_manage_templates %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.app_name == 'mapping' %}active{% endif %}" href="{% url 'mapping:list' %}" title="Template Mapping">
+        <i class="bi bi-diagram-3"></i>
+        <span class="sp-nav-text">Template Mapping</span>
+      </a>
+    </li>
+    {% endif %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.app_name == 'branches' %}active{% endif %}" href="{% url 'branches:list' %}" title="Branches">
+        <i class="bi bi-diagram-2"></i>
+        <span class="sp-nav-text">Branches</span>
+      </a>
+    </li>
+    {% if user.profile.is_admin %}
+    <li class="nav-item">
+      <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'accounts:user_list' %}" title="Users">
+        <i class="bi bi-people"></i>
+        <span class="sp-nav-text">Users</span>
+      </a>
+    </li>
+    {% endif %}
+  </ul>
+</div>
+
+<div class="sp-user mt-auto pt-2">
   <div class="d-flex align-items-center gap-2 sp-user-wrapper">
-    <div class="sp-user-avatar" title="{{ user.username }} ({{ user.profile.role }})">{{ user.username|slice:":1"|upper }}</div>
-    <div class="sp-user-info">
-      <div class="fw-semibold text-capitalize">{{ user.username }}</div>
+    <div class="sp-user-avatar" title="{{ user.username }}">{{ user.username|slice:":1"|upper }}</div>
+    <div class="sp-user-info overflow-hidden">
+      <div class="fw-semibold text-truncate">{{ user.username }}</div>
       <div class="small text-uppercase sp-role-badge">{{ user.profile.role }}</div>
     </div>
   </div>
   <a href="{% url 'accounts:logout' %}" class="btn btn-sm btn-outline-light mt-2 w-100 sp-logout-btn" title="Logout">
-    <i class="bi bi-box-arrow-right"></i>
-    <span class="sp-logout-text"> Logout</span>
+    <i class="bi bi-box-arrow-right d-none sp-logout-icon"></i>
+    <span class="sp-logout-text">Logout</span>
   </a>
 </div>
 
-<script>
+<!-- <script>
 window.spToggleSidebar = function(e) {
   if (e) {
     if (e.preventDefault) e.preventDefault();
@@ -116,4 +130,4 @@ window.spToggleSidebar = function(e) {
     }
   } catch (err) {}
 })();
-</script>
+</script> -->
