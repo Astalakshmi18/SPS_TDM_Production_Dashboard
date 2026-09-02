@@ -154,6 +154,49 @@ def project_sync_all(request):
 
 
 @csrf_exempt
+def cron_sync_all(request, token):
+    """Token-protected bulk sync, meant to be hit by an external scheduler
+    (e.g. a free cron-ping service or Render Cron Job) every N minutes -
+    NOT by a logged-in user, so it doesn't use @login_required. The token
+    in the URL (CRON_SYNC_TOKEN setting) is the only thing keeping this from
+    being a public "resync everything" endpoint anyone could spam.
+
+    Syncs every project that has a google_sheet_url set, regardless of who
+    normally has view access to it in the app - a cron job has no "user".
+    """
+    import concurrent.futures
+
+    expected_token = getattr(settings, "CRON_SYNC_TOKEN", "")
+    if not expected_token or token != expected_token:
+        return JsonResponse({"error": "invalid token"}, status=403)
+
+    projects = list(Project.objects.exclude(google_sheet_url=""))
+    synced, failed = [], []
+
+    def _sync_one(project):
+        try:
+            updated, errors = resync_project(project)
+        except GoogleSheetError as exc:
+            return project.project_name, None, [str(exc)]
+        return project.project_name, updated, errors
+
+    if projects:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(projects))) as pool:
+            for name, updated, errors in pool.map(_sync_one, projects):
+                if errors or not updated:
+                    failed.append(name)
+                else:
+                    synced.append(name)
+
+    return JsonResponse({
+        "status": "ok",
+        "synced": synced,
+        "failed": failed,
+        "total_linked_projects": len(projects),
+    })
+
+
+@csrf_exempt
 @require_POST
 def gsheet_webhook(request, pk, token):
     """Push endpoint for a Google Apps Script trigger bound to the sheet

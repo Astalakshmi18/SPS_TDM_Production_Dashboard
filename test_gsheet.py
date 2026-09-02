@@ -1,5 +1,12 @@
 """
 Quick standalone test for the Google Sheet OAuth connection.
+
+Run this BEFORE running the full dashboard, to check the
+GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET / GOOGLE_OAUTH_REFRESH_TOKEN
+values actually work, without needing the server, database, or login.
+
+Usage:
+    python test_gsheet.py "PASTE_YOUR_GOOGLE_SHEET_LINK_HERE"
 """
 import os
 import sys

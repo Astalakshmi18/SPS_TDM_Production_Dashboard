@@ -15,4 +15,5 @@ urlpatterns = [
     path("<int:pk>/insights/", views.project_insights, name="insights"),
     path("<int:pk>/sync-now/", views.project_sync_now, name="sync_now"),
     path("webhook/<int:pk>/<str:token>/", views.gsheet_webhook, name="gsheet_webhook"),
+    path("cron/sync-all/<str:token>/", views.cron_sync_all, name="cron_sync_all"),
 ]

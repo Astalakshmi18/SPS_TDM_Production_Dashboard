@@ -17,3 +17,9 @@ services:
         sync: false
       - key: GOOGLE_OAUTH_REFRESH_TOKEN
         sync: false
+      - key: CRON_SYNC_TOKEN
+        generateValue: true
+      - key: ENABLE_AUTO_SYNC_SCHEDULER
+        value: "True"
+      - key: AUTO_SYNC_INTERVAL_MINUTES
+        value: "30"

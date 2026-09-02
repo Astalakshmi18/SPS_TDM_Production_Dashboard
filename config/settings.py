@@ -186,6 +186,19 @@ GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = env("GOOGLE_OAUTH_CLIENT_SECRET", default="")
 GOOGLE_OAUTH_REFRESH_TOKEN = env("GOOGLE_OAUTH_REFRESH_TOKEN", default="")
 
+# Shared-secret token for the unauthenticated auto-sync endpoint
+# (apps/projects/views.py: cron_sync_all). An external scheduler (cron-job.org,
+# Render Cron Job, etc.) hits /projects/cron/sync-all/<this token>/ every
+# 30 min to re-pull every project's linked Google Sheet automatically.
+CRON_SYNC_TOKEN = env("CRON_SYNC_TOKEN", default="")
+
+# In-process auto-sync (apps/projects/scheduler.py) - runs entirely inside
+# this server, no external service involved. Off by default so it doesn't
+# surprise-activate; turn on with ENABLE_AUTO_SYNC_SCHEDULER=True once
+# GOOGLE_OAUTH_* is confirmed working. See AUTO_SYNC_SETUP.md.
+ENABLE_AUTO_SYNC_SCHEDULER = env("ENABLE_AUTO_SYNC_SCHEDULER", default=False, cast=bool)
+AUTO_SYNC_INTERVAL_MINUTES = env("AUTO_SYNC_INTERVAL_MINUTES", default=30, cast=int)
+
 # The four physical branches. Kept here (not just DB) so seed/migration scripts
 # and the mapping engine can validate against a single source of truth.
 BRANCH_CHOICES = [
@@ -194,3 +207,15 @@ BRANCH_CHOICES = [
     ("KPM", "Kanchipuram"),
     ("MDU", "Madurai"),
 ]
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+}
