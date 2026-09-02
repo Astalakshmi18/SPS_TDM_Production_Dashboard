@@ -401,24 +401,24 @@ class Project(models.Model):
 
     @property
     def expected_percent(self):
-        """Expected % via a CUMULATIVE weekly target, not a flat week
-        fraction:
+        """Expected % via a CUMULATIVE DAILY target (working days only,
+        Sunday excluded):
           1. total working days = Mon-Sat across the whole project (Sunday
              excluded) - same as `working_days_total`.
           2. daily target = Total Volume ÷ total working days.
-          3. each week's target = daily target × THAT week's own working-day
-             count (a short opening/closing week gets a proportionally
-             smaller share, not an even 1/N split).
-          4. Cumulative Target = running sum of weekly targets, up through
-             the week containing today.
-          5. Expected % = Cumulative Target ÷ Total Volume × 100.
-        Because step 4 adds a week's FULL target as soon as its Monday
-        arrives (not scaled by day-of-week), this steps up once per week and
-        only changes on Mondays - matches "should auto-update every Monday
-        as the current project week changes." Verified against the supplied
-        worked example (Week 1 = 2,532 / Week 2 cumulative = 10,127 / final
-        cumulative = 100,000 for a 1 May-31 Jul 2026, 100,000-volume
-        project) - reproduces it exactly."""
+          3. each week's FULL target = daily target × THAT week's own
+             working-day count (a short opening/closing week gets a
+             proportionally smaller share, not an even 1/N split) - used
+             for any week that has fully elapsed.
+          4. For the CURRENT (in-progress) week, only the working days that
+             have actually elapsed so far (Monday up through today, Sundays
+             don't count) are added - not the whole week's target - so this
+             steps up on every working day, not just Mondays.
+          5. Cumulative Target = sum of completed weeks' full targets, plus
+             the current week's elapsed-so-far target.
+          6. Expected % = Cumulative Target ÷ Total Volume × 100.
+        (Previously this only advanced once per week, on Mondays - now it
+        advances every working day.)"""
         total_working_days = self.working_days_total
         if not total_working_days or not self.target_records:
             return 0.0
@@ -428,7 +428,16 @@ class Project(models.Model):
         for week in self._weekly_working_days():
             if week["week_start"] > today:
                 break
-            cumulative += week["working_days"] * daily_target
+            if week["week_end"] <= today:
+                # Week has fully elapsed - count its whole target.
+                cumulative += week["working_days"] * daily_target
+            else:
+                # Current, still-in-progress week - count only the working
+                # days elapsed so far (clipped to the project's own start).
+                actual_start = max(week["week_start"], self.start_date)
+                elapsed_end = min(today, week["week_end"])
+                elapsed_days = _working_days(actual_start, elapsed_end) if actual_start <= elapsed_end else 0
+                cumulative += elapsed_days * daily_target
         return round(min(cumulative / self.target_records, 1) * 100, 2)
 
     def shipped_records_by(self, target_date):
