@@ -11,3 +11,9 @@ services:
         generateValue: true
       - key: ALLOWED_HOSTS
         value: "*"
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_OAUTH_REFRESH_TOKEN
+        sync: false

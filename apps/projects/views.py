@@ -224,10 +224,11 @@ def project_upload(request):
     # UserProfile.can_create_projects.
     """Two import sources feed the same mapping engine:
       - "file": a directly uploaded .xlsx/.xls
-      - "gsheet": a Google Sheet link (must be shared as "Anyone with the
-        link can view") - it's downloaded once as .xlsx and imported exactly
-        like a file upload, so the mapping config never has to know the
-        difference.
+      - "gsheet": a Google Sheet link (must be shared - Viewer is enough -
+        with the Google account connected via GOOGLE_OAUTH_* env vars, see
+        SETUP_GSHEET_OAUTH.md) - it's downloaded once as .xlsx and imported
+        exactly like a file upload, so the mapping config never has to know
+        the difference.
     Only templates whose branch this user can access are offered - a
     Manager scoped to TDM never even sees a CHN template in the dropdown,
     and the branch is re-checked server-side on submit too.

@@ -178,6 +178,14 @@ MAPPINGS_DIR = BASE_DIR / "mappings"
 # of semantic understanding. Get a key at https://aistudio.google.com/apikey
 GEMINI_API_KEY = env("GEMINI_API_KEY", default="")
 
+# Google Sheets import (apps/projects/gsheet.py) authenticates as a specific
+# connected Google account via OAuth2 refresh token, instead of relying on
+# "Anyone with the link can view" sharing. See SETUP_GSHEET_OAUTH.md for the
+# one-time steps to obtain these values.
+GOOGLE_OAUTH_CLIENT_ID = env("GOOGLE_OAUTH_CLIENT_ID", default="")
+GOOGLE_OAUTH_CLIENT_SECRET = env("GOOGLE_OAUTH_CLIENT_SECRET", default="")
+GOOGLE_OAUTH_REFRESH_TOKEN = env("GOOGLE_OAUTH_REFRESH_TOKEN", default="")
+
 # The four physical branches. Kept here (not just DB) so seed/migration scripts
 # and the mapping engine can validate against a single source of truth.
 BRANCH_CHOICES = [
