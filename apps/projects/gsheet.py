@@ -25,7 +25,18 @@ root for the full click-by-click steps):
          GOOGLE_OAUTH_CLIENT_ID
          GOOGLE_OAUTH_CLIENT_SECRET
          GOOGLE_OAUTH_REFRESH_TOKEN
+
+Large-sheet fallback: Drive's "export as .xlsx" conversion has its own hard
+size ceiling (Google returns 403 exportSizeLimitExceeded, "This file is too
+large to be exported" - seen in practice on a multi-thousand-row Inventory
+tracker) that has nothing to do with sharing/permissions. When that specific
+error is hit, this module rebuilds an equivalent local .xlsx itself using
+the Sheets API (per-sheet cell values + number-format-type, to tell real
+dates apart from plain numbers) instead of asking Drive to convert the
+whole file at once - the same "drive.readonly" scope already covers the
+Sheets API too, no re-authorization needed.
 """
+import datetime
 import re
 import uuid
 
@@ -39,7 +50,9 @@ SHEET_ID_PATTERNS = [
 
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 DRIVE_EXPORT_URL = "https://www.googleapis.com/drive/v3/files/{file_id}/export"
+SHEETS_API_URL = "https://sheets.googleapis.com/v4/spreadsheets/{sheet_id}"
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+GOOGLE_SERIAL_EPOCH = datetime.date(1899, 12, 30)  # matches Excel's own date system
 
 
 class GoogleSheetError(Exception):
@@ -95,6 +108,124 @@ def _get_access_token() -> str:
     return token
 
 
+def _is_export_size_limit_error(response) -> bool:
+    try:
+        reason = response.json().get("error", {}).get("errors", [{}])[0].get("reason", "")
+    except Exception:
+        reason = ""
+    return reason == "exportSizeLimitExceeded" or "too large to be exported" in response.text.lower()
+
+
+def _sheet_titles(sheet_id, access_token):
+    resp = requests.get(
+        SHEETS_API_URL.format(sheet_id=sheet_id),
+        params={"fields": "sheets.properties.title"},
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=30,
+    )
+    if resp.status_code != 200:
+        raise GoogleSheetError(f"Could not list this sheet's tabs (HTTP {resp.status_code}).")
+    return [s["properties"]["title"] for s in resp.json().get("sheets", [])]
+
+
+def _date_mask_for_sheet(sheet_id, title, access_token):
+    """Per-cell True/False grid (same shape as the values grid) saying
+    whether that cell is formatted as a date/datetime - values.get alone
+    can't tell a date apart from a plain number once both are pulled as raw
+    (UNFORMATTED_VALUE) serial numbers, so this is fetched separately.
+    Format-only (no cell values in this call), which keeps it much lighter
+    than asking for full styled grid data on a huge sheet."""
+    resp = requests.get(
+        SHEETS_API_URL.format(sheet_id=sheet_id),
+        params={
+            "ranges": title,
+            "fields": "sheets.data.rowData.values.effectiveFormat.numberFormat.type",
+        },
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=60,
+    )
+    if resp.status_code != 200:
+        return []  # non-fatal - cells just won't be recognized as dates
+    sheets_data = resp.json().get("sheets", [])
+    if not sheets_data:
+        return []
+    row_data = sheets_data[0].get("data", [{}])[0].get("rowData", [])
+    mask = []
+    for row in row_data:
+        row_mask = []
+        for cell in row.get("values", []):
+            fmt_type = cell.get("effectiveFormat", {}).get("numberFormat", {}).get("type")
+            row_mask.append(fmt_type in ("DATE", "DATE_TIME"))
+        mask.append(row_mask)
+    return mask
+
+
+def _sheet_values(sheet_id, title, access_token):
+    from urllib.parse import quote
+
+    resp = requests.get(
+        f"{SHEETS_API_URL.format(sheet_id=sheet_id)}/values/{quote(title, safe='')}",
+        params={"valueRenderOption": "UNFORMATTED_VALUE", "dateTimeRenderOption": "SERIAL_NUMBER"},
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=90,
+    )
+    if resp.status_code != 200:
+        return []  # skip this tab rather than fail the whole workbook
+    return resp.json().get("values", [])
+
+
+def _rebuild_via_sheets_api(sheet_id, access_token):
+    """Reconstructs an equivalent local .xlsx by reading raw cell data
+    through the Sheets API (one sheet/tab at a time) instead of asking
+    Drive to convert the whole workbook to .xlsx in one shot - the
+    conversion step is what actually has the size ceiling, not reading the
+    data itself.
+
+    Known limitation: only DATE/DATE_TIME formatted cells are converted
+    back from Google's raw serial-number representation - a cell formatted
+    as PERCENT comes back from UNFORMATTED_VALUE as its raw fraction (0.15,
+    not 15), unlike the normal Drive-export path where Excel's own percent
+    formatting is preserved. Only affects sheets big enough to hit this
+    fallback; fine for every field currently mapped from such a sheet
+    (Inventory rows), but worth knowing if a future template maps a
+    percent-formatted cell from an oversized sheet."""
+    import openpyxl
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+
+    used_titles = set()
+    for title in _sheet_titles(sheet_id, access_token):
+        # Excel sheet names can't contain \ / ? * [ ] : (Google Sheets tab
+        # names have no such restriction, so a real tab title like "BV/AT"
+        # would otherwise crash openpyxl here) and are capped at 31 chars.
+        safe_title = re.sub(r'[\\/?*\[\]:]', "-", title)[:31].strip() or "Sheet"
+        if safe_title in used_titles:
+            suffix = 2
+            while f"{safe_title[:28]}_{suffix}" in used_titles:
+                suffix += 1
+            safe_title = f"{safe_title[:28]}_{suffix}"
+        used_titles.add(safe_title)
+        ws = wb.create_sheet(title=safe_title)
+
+        date_mask = _date_mask_for_sheet(sheet_id, title, access_token)
+        values = _sheet_values(sheet_id, title, access_token)
+
+        for r_idx, row in enumerate(values):
+            for c_idx, value in enumerate(row):
+                is_date = (
+                    r_idx < len(date_mask) and c_idx < len(date_mask[r_idx])
+                    and date_mask[r_idx][c_idx]
+                    and isinstance(value, (int, float))
+                )
+                cell_value = (GOOGLE_SERIAL_EPOCH + datetime.timedelta(days=value)) if is_date else value
+                ws.cell(row=r_idx + 1, column=c_idx + 1, value=cell_value)
+
+    if not wb.sheetnames:
+        raise GoogleSheetError("Could not read any tabs from this sheet via the Sheets API either.")
+    return wb
+
+
 def download_as_xlsx(url_or_id: str) -> str:
     """Downloads the sheet (as the connected Google account) and returns
     the local file path it was saved to."""
@@ -111,6 +242,19 @@ def download_as_xlsx(url_or_id: str) -> str:
     except requests.RequestException as exc:
         raise GoogleSheetError(f"Could not reach Google Sheets: {exc}") from exc
 
+    uploads_dir = settings.MEDIA_ROOT / "uploads"
+    uploads_dir.mkdir(parents=True, exist_ok=True)
+    file_name = f"gsheet_{sheet_id[:8]}_{uuid.uuid4().hex[:6]}.xlsx"
+    file_path = uploads_dir / file_name
+
+    if response.status_code == 403 and _is_export_size_limit_error(response):
+        # Drive's own "convert to .xlsx" step has a hard size ceiling this
+        # sheet exceeds - rebuild it ourselves via the Sheets API instead
+        # (same account, same permission, no re-authorization needed).
+        wb = _rebuild_via_sheets_api(sheet_id, access_token)
+        wb.save(file_path)
+        return str(file_path)
+
     if response.status_code == 404:
         raise GoogleSheetError(
             "Sheet not found, or the connected Google account doesn't have "
@@ -125,10 +269,5 @@ def download_as_xlsx(url_or_id: str) -> str:
     if response.status_code != 200:
         raise GoogleSheetError(f"Google Sheets returned HTTP {response.status_code}.")
 
-    uploads_dir = settings.MEDIA_ROOT / "uploads"
-    uploads_dir.mkdir(parents=True, exist_ok=True)
-    file_name = f"gsheet_{sheet_id[:8]}_{uuid.uuid4().hex[:6]}.xlsx"
-    file_path = uploads_dir / file_name
     file_path.write_bytes(response.content)
-
     return str(file_path)
