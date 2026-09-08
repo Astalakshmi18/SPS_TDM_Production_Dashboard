@@ -64,20 +64,35 @@ the same sheet only pays the parse cost once.
 from __future__ import annotations
 
 import datetime
+import re
 from dataclasses import dataclass, field
 
 import openpyxl
 import pandas as pd
+from openpyxl.utils import column_index_from_string
 
 STANDARD_SCHEMA = [
     "project_name", "branch", "start_date", "end_date",
     "target", "delivered", "images",
     "language", "vendor", "event_type", "ocr_status",
     "total_batches", "batches_being_keyed", "promoted",
+    "gm_name", "pm_name", "pl_name",
+    "branch_manpower_count", "inhouse_manpower_count",
+    "throughput_branch", "throughput_inhouse", "quoted_throughput",
 ]
 
+# Shared by extract_inventory_rows and extract_weekly_delivery_rows to
+# recognize a trailing summary row (a SUM formula's *value* sitting in the
+# same columns as real data rows) so it never gets counted as one - real
+# trackers phrase this several different ways.
+TOTAL_ROW_KEYWORDS = {"total", "grand total", "totals", "sub total", "subtotal", "sum"}
+
 REQUIRED_FIELDS = ["project_name", "branch", "start_date", "end_date", "target", "delivered", "images"]
-NUMERIC_FIELDS = ("target", "delivered", "images", "total_batches", "batches_being_keyed", "promoted")
+NUMERIC_FIELDS = (
+    "target", "delivered", "images", "total_batches", "batches_being_keyed", "promoted",
+    "branch_manpower_count", "inhouse_manpower_count",
+    "throughput_branch", "throughput_inhouse", "quoted_throughput",
+)
 
 
 @dataclass
@@ -85,7 +100,19 @@ class MappingResult:
     values: dict = field(default_factory=dict)
     extra: dict = field(default_factory=dict)
     inventory_rows: list = field(default_factory=list)
+    weekly_delivery_rows: list = field(default_factory=list)
+    daily_metrics: dict = field(default_factory=dict)
+    daily_metric_series: dict = field(default_factory=dict)
     errors: list = field(default_factory=list)
+    # Extraction problems on a NON-required field (e.g. pl_name pointing at
+    # a column this particular workbook doesn't have) - visible for
+    # troubleshooting, but unlike `errors` they do NOT fail the whole
+    # import. Before this existed, one optional field's bad rule blocked
+    # saving the entire project, silently keeping every OTHER field stale
+    # too - a project with a working "Prepapred by"/"Approved by" mapping
+    # but a mistyped "PL Name" column would get NONE of its data (not even
+    # the two that worked) re-synced, with no obvious reason why.
+    warnings: list = field(default_factory=list)
 
     @property
     def is_valid(self):
@@ -313,7 +340,7 @@ def extract_inventory_rows(cache, rule: dict) -> list:
     # summing them on top of the individual rows silently double-counts
     # Delivered/Received Records, so they're dropped here before anything
     # downstream (InventoryItem rows, column sums) ever sees them.
-    TOTAL_KEYWORDS = {"total", "grand total", "totals", "sub total", "subtotal", "sum"}
+    TOTAL_KEYWORDS = TOTAL_ROW_KEYWORDS
     header_labels = {_normalize_header(v) for v in resolved.values()}
     # Whether this template maps a real per-row identifier at all - only
     # templates that do can have this next check applied, so it never
@@ -342,6 +369,269 @@ def extract_inventory_rows(cache, rule: dict) -> list:
     return [r for r in records if not _is_junk_row(r)]
 
 
+_MONTH_YEAR_RE = re.compile(
+    r"\b(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec)\w*\s+(\d{4})\b", re.IGNORECASE
+)
+_WEEKLY_HEADER_ALIASES = {
+    "sno": "sno", "s.no": "sno", "s no": "sno", "sl no": "sno", "sl.no": "sno",
+    "week": "week_label", "week no": "week_label", "week number": "week_label", "week name": "week_label",
+    "date of shipment": "shipment_date", "shipment date": "shipment_date", "ship date": "shipment_date",
+    "delivery date": "shipment_date",
+    "plan # records": "plan_records", "plan records": "plan_records", "planned records": "plan_records",
+    "plan volume": "plan_records", "target records": "plan_records", "monthly plan": "plan_records",
+    "plan": "plan_records",
+    "actual shipped # records": "actual_records", "actual shipped records": "actual_records",
+    "actual records": "actual_records", "achieved records": "actual_records", "shipped records": "actual_records",
+    "delivered records": "actual_records", "actual": "actual_records", "achieved": "actual_records",
+    "variance": "variance", "gap": "variance",
+    "variance %": "variance_pct", "gap %": "variance_pct", "variance%": "variance_pct",
+    "reason": "reason",
+    "remarks": "remarks", "remark": "remarks",
+}
+
+
+def _weekly_num(v):
+    if v in (None, "", "-"):
+        return 0
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _is_weekly_plan_title_row(values) -> str | None:
+    """A month-block title row, whatever exact wording a given project uses
+    ("August 2026 - Weekly Delivery Plan", "Weekly Plan - August 2026",
+    just "August 2026", ...): detected generically as a row containing
+    exactly ONE non-blank cell, whose text contains a recognizable
+    "<Month> <year>" pattern - not by matching one fixed phrase. Returns
+    the matched "Month Year" text (used as this block's month_label,
+    exactly as the sheet itself wrote it) or None if this isn't a title
+    row. Requiring the row to otherwise be blank avoids a data row's
+    "Remarks" text that happens to mention a month/year being mistaken for
+    a new block."""
+    non_blank = [v for v in values if v is not None and not (isinstance(v, str) and not v.strip())]
+    if len(non_blank) != 1 or not isinstance(non_blank[0], str):
+        return None
+    m = _MONTH_YEAR_RE.search(non_blank[0])
+    return m.group(0) if m else None
+
+
+def extract_weekly_delivery_rows(wb, rule: dict) -> list:
+    """Parses a repeating-block-per-month delivery-plan sheet: a title row
+    naming that month (any wording, see _is_weekly_plan_title_row), that
+    block's own header row (Sno/Week/Date of Shipment/Plan/Actual/Variance/
+    Variance %/Reason/Remarks - matched by name against a broad synonym
+    list, any subset, in any order/position), one row per week, then a
+    Total/Grand Total row closing that month before the next month's title
+    starts the same pattern again. Column POSITIONS and exact wording are
+    never assumed - only the repeating title/header/rows/total shape is,
+    so the same rule works unchanged across differently-worded or
+    differently-ordered projects.
+
+    Reads raw cells directly (not pandas via _SheetCache) because the
+    "real header row" moves - it's whatever row immediately follows each
+    month's title row, not a single fixed row number for the whole sheet."""
+    sheet = rule.get("sheet")
+    if not sheet or sheet not in wb.sheetnames:
+        return []
+    ws = wb[sheet]
+
+    rows_out = []
+    current_month = None
+    header_map = None  # {column index: our field name}, reset per month block
+    expect_header_next = False
+
+    def _norm(v):
+        return " ".join(str(v).split()).strip().lower() if v is not None else ""
+
+    for row_cells in ws.iter_rows():
+        values = [c.value for c in row_cells]
+
+        title = _is_weekly_plan_title_row(values)
+        if title:
+            current_month = title
+            expect_header_next = True
+            header_map = None
+            continue
+
+        if expect_header_next:
+            header_map = {}
+            for idx, v in enumerate(values):
+                key = _WEEKLY_HEADER_ALIASES.get(_norm(v))
+                if key:
+                    header_map[idx] = key
+            expect_header_next = False
+            continue
+
+        if current_month is None or not header_map:
+            continue
+
+        if all(v is None or (isinstance(v, str) and not v.strip()) for v in values):
+            # Blank row - this month's block is done (next real content row
+            # is either the next month's title, or the sheet's end).
+            current_month = None
+            header_map = None
+            continue
+
+        row_data = {}
+        for idx, key in header_map.items():
+            if idx < len(values):
+                row_data[key] = values[idx]
+
+        # A Total/Grand Total row can have that label in ANY text cell
+        # (not necessarily the "Week" column specifically) depending on how
+        # a given project's sheet is laid out.
+        is_total = any(
+            isinstance(v, str) and v.strip().lower() in TOTAL_ROW_KEYWORDS for v in values
+        )
+
+        shipment_date = row_data.get("shipment_date")
+        if isinstance(shipment_date, datetime.datetime):
+            shipment_date = shipment_date.date()
+        elif not isinstance(shipment_date, datetime.date):
+            shipment_date = None  # placeholder text like "-", or genuinely blank
+
+        # In production workflow, shipment cut-off is on Saturday.
+        # If Monday (weekday 0) or Sunday (weekday 6) was logged, adjust to the preceding Saturday.
+        if shipment_date and not is_total:
+            if shipment_date.weekday() == 0:  # Monday
+                shipment_date = shipment_date - datetime.timedelta(days=2)
+            elif shipment_date.weekday() == 6:  # Sunday
+                shipment_date = shipment_date - datetime.timedelta(days=1)
+
+        rows_out.append({
+            "month_label": current_month,
+            "week_label": str(row_data.get("week_label") or "").strip(),
+            "sno": row_data.get("sno") if isinstance(row_data.get("sno"), (int, float)) else None,
+            "shipment_date": shipment_date,
+            "plan_records": _weekly_num(row_data.get("plan_records")),
+            "actual_records": _weekly_num(row_data.get("actual_records")),
+            "variance": _weekly_num(row_data.get("variance")),
+            "variance_pct": _weekly_num(row_data.get("variance_pct")),
+            "reason": row_data.get("reason") or "",
+            "remarks": row_data.get("remarks") or "",
+            "is_total": is_total,
+        })
+
+    return rows_out
+
+
+_DAILY_METRIC_KEYS = ("branch_receipt", "rqc_completed", "rqc_quality_score")
+
+
+_COLUMN_LETTER_RE = re.compile(r"^[A-Za-z]{1,3}$")
+
+
+def _resolve_column(df, col_spec):
+    """A rule's column can be either a header NAME (default - matched like
+    every other rule in this file, whitespace/case-insensitive) or a plain
+    Excel column LETTER ("A", "B", "AC"...) for a sheet whose headers are
+    messy, blank, merged, or duplicated - "C" always means the 3rd column
+    on that sheet regardless of what text (if any) actually sits in its
+    header row. Returns the matching dataframe column name (still needed
+    to index into df), or None if nothing matches."""
+    spec = str(col_spec).strip()
+    if _COLUMN_LETTER_RE.match(spec):
+        idx = column_index_from_string(spec.upper()) - 1
+        return df.columns[idx] if 0 <= idx < len(df.columns) else None
+    return next((c for c in df.columns if _normalize_header(c) == _normalize_header(spec)), None)
+
+
+def extract_daily_metric(cache, rule: dict) -> dict | None:
+    """A single 'as of the most recent day present' figure from an
+    Inventory-shaped sheet - e.g. Daily Branch Receipt, Daily RQC
+    Completed, RQC Quality Score on the Operational Dashboard."""
+    sheet = rule.get("sheet")
+    date_col = rule.get("date_column")
+    value_col = rule.get("value_column")
+    agg = (rule.get("agg") or "sum").lower()
+    if not sheet or not value_col:
+        return None
+
+    df = cache.get(sheet, rule.get("header_row", 1))
+    value_match = _resolve_column(df, value_col)
+    if value_match is None:
+        raise KeyError(f"Column '{value_col}' not found on sheet '{sheet}'")
+
+    values = pd.to_numeric(
+        df[value_match].astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False),
+        errors="coerce",
+    )
+
+    if not date_col:
+        subset = values[values.notna()]
+        if subset.empty:
+            return None
+        result_value = subset.mean() if agg == "avg" else subset.sum()
+        if agg == "avg" and 0 < result_value <= 1.0:
+            result_value *= 100.0
+        return {"value": round(float(result_value), 2), "as_of": "all time"}
+
+    date_match = _resolve_column(df, date_col)
+    if date_match is None:
+        raise KeyError(f"Column '{date_col}' not found on sheet '{sheet}'")
+
+    dates = pd.to_datetime(df[date_match], errors="coerce").dt.normalize()
+    today = pd.Timestamp(datetime.date.today())
+    valid = dates.notna() & values.notna() & (dates <= today)
+    if not valid.any():
+        return None
+
+    target_date = today if (dates[valid] == today).any() else dates[valid].max()
+
+    # STRICT: never silently show a PREVIOUS MONTH's figure as if it were
+    # today's/this month's - if the most recent real data available isn't
+    # even in the CURRENT calendar month yet (e.g. this month just started
+    # and the sheet hasn't been updated with any of its rows yet), there's
+    # genuinely no "Daily" figure for this month yet, so report nothing
+    # rather than a stale prior-month number quietly standing in for it.
+    # (The full history behind the Calendar view - extract_daily_metric_
+    # series below - is unaffected: past months' real data still shows up
+    # there when you click an actual past date, this only guards the
+    # single "current" snapshot value.)
+    if target_date.year != today.year or target_date.month != today.month:
+        return None
+
+    subset = values[valid & (dates == target_date)]
+    if subset.empty:
+        return None
+
+    result_value = subset.mean() if agg == "avg" else subset.sum()
+    if agg == "avg" and 0 < result_value <= 1.0:
+        result_value *= 100.0
+    return {"value": round(float(result_value), 2), "as_of": target_date.date().isoformat()}
+
+
+def extract_daily_metric_series(cache, rule: dict) -> list:
+    sheet = rule.get("sheet")
+    date_col = rule.get("date_column")
+    value_col = rule.get("value_column")
+    agg = (rule.get("agg") or "sum").lower()
+    if not sheet or not date_col or not value_col:
+        return []
+
+    df = cache.get(sheet, rule.get("header_row", 1))
+    date_match = _resolve_column(df, date_col)
+    value_match = _resolve_column(df, value_col)
+    if date_match is None or value_match is None:
+        raise KeyError(f"Column '{date_col if date_match is None else value_col}' not found on sheet '{sheet}'")
+
+    dates = pd.to_datetime(df[date_match], errors="coerce").dt.normalize()
+    values = pd.to_numeric(
+        df[value_match].astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False),
+        errors="coerce",
+    )
+    today = pd.Timestamp(datetime.date.today())
+    valid = dates.notna() & values.notna() & (dates <= today)
+    if not valid.any():
+        return []
+
+    grouped = values[valid].groupby(dates[valid])
+    agg_series = grouped.mean() if agg == "avg" else grouped.sum()
+    return [{"date": d.date().isoformat(), "value": round(float(v), 2)} for d, v in agg_series.items()]
+
+
 def safe_load_workbook(xls_path, data_only=True):
     try:
         return openpyxl.load_workbook(xls_path, data_only=data_only, read_only=True)
@@ -366,7 +656,7 @@ def apply_mapping(xls_path, config: dict) -> MappingResult:
     try:
         sheet_names = wb.sheetnames
 
-        core_config = {k: v for k, v in config.items() if k != "extra_fields"}
+        core_config = {k: v for k, v in config.items() if k not in ("extra_fields", "weekly_delivery_rows", "daily_metrics")}
         header_errors = validate_headers(sheet_names, core_config)
         if header_errors:
             result.errors.extend(header_errors)
@@ -381,7 +671,15 @@ def apply_mapping(xls_path, config: dict) -> MappingResult:
             try:
                 raw = extract_field(wb, cache, rule)
             except Exception as exc:
-                result.errors.append(f"[{field_name}] {exc}")
+                # A required field failing here is a real import-blocking
+                # problem. A NON-required field failing (e.g. a "PL Name"
+                # rule pointing at a column this particular workbook
+                # doesn't have) is not - the field is just left unset,
+                # every OTHER field (required or not) still gets saved
+                # normally, and this shows up as a warning instead of
+                # silently blocking the whole project's sync.
+                target = result.errors if field_name in REQUIRED_FIELDS else result.warnings
+                target.append(f"[{field_name}] {exc}")
                 continue
 
             if field_name in ("start_date", "end_date"):
@@ -430,6 +728,36 @@ def apply_mapping(xls_path, config: dict) -> MappingResult:
                     # the other sheets' rows.
                     continue
             result.inventory_rows = rows
+
+        weekly_rule = config.get("weekly_delivery_rows")
+        if weekly_rule:
+            try:
+                result.weekly_delivery_rows = extract_weekly_delivery_rows(wb, weekly_rule)
+            except Exception as exc:
+                # Enrichment, not required - never blocks the core Project
+                # import (same reasoning as inventory_rows/extra_fields).
+                result.warnings.append(f"[weekly_delivery_rows] {exc}")
+
+        daily_config = config.get("daily_metrics") or {}
+        for key in _DAILY_METRIC_KEYS:
+            rule = daily_config.get(key)
+            if not rule:
+                continue
+            try:
+                metric = extract_daily_metric(cache, rule)
+            except Exception as exc:
+                result.warnings.append(f"[daily_metrics.{key}] {exc}")
+                continue
+            if metric is not None:
+                result.daily_metrics[key] = metric
+
+            try:
+                series = extract_daily_metric_series(cache, rule)
+            except Exception as exc:
+                result.warnings.append(f"[daily_metrics.{key}.series] {exc}")
+                continue
+            if series:
+                result.daily_metric_series[key] = series
     finally:
         wb.close()
 

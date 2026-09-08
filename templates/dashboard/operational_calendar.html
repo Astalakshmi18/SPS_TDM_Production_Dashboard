@@ -1,0 +1,134 @@
+{% extends "base/base.html" %}
+{% load humanize %}
+{% block title %}{{ project.project_name }} - Calendar - Swift Prosys{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">{{ project.project_name }} — Calendar</h4>
+    <div class="small text-muted">Click any date to see that day's, that week's, and that month's figures.</div>
+  </div>
+  <a href="{% url 'dashboard:operational' %}?project={{ project.pk }}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Table View</a>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+  <form method="get" action="" id="projectSwitchForm" class="d-flex gap-2">
+    <select name="__project" class="form-select form-select-sm w-auto" onchange="window.location=this.selectedOptions[0].dataset.url">
+      {% for p in all_projects %}
+      <option value="{{ p.pk }}" data-url="{% url 'dashboard:operational_calendar' p.pk %}" {% if p.pk == project.pk %}selected{% endif %}>{{ p.project_name }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="sp-panel">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <a href="?year={{ prev_year }}&month={{ prev_month }}" class="btn btn-sm btn-outline-secondary">&larr;</a>
+        <h6 class="mb-0">{{ month_name }} {{ year }}</h6>
+        <a href="?year={{ next_year }}&month={{ next_month }}" class="btn btn-sm btn-outline-secondary">&rarr;</a>
+      </div>
+      <table class="table table-bordered text-center mb-0" style="table-layout: fixed;">
+        <thead>
+          <tr>
+            <th>Mon</th><th>Tue</th><th>Wed</th><th>Thu</th><th>Fri</th><th>Sat</th><th>Sun</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for week in month_days %}
+          <tr>
+            {% for day in week %}
+              {% if day == 0 %}
+                <td class="text-muted"></td>
+              {% else %}
+                <td class="sp-cal-day {% if day in data_days %}sp-cal-has-data{% endif %} {% if day == today.day and month == today.month and year == today.year %}sp-cal-today{% endif %}"
+                    data-date="{{ year }}-{{ month|stringformat:'02d' }}-{{ day|stringformat:'02d' }}"
+                    role="button" tabindex="0">
+                  {{ day }}
+                </td>
+              {% endif %}
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p class="small text-muted mt-2 mb-0">Shaded dates have Branch Receipt / RQC Completed data. Click any date (shaded or not) to see that day/week/month's figures.</p>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="sp-panel" id="dayDetailPanel">
+      <h6 class="mb-3">Day / Week / Month Detail</h6>
+      <p class="text-muted small" id="dayDetailPlaceholder">Click a date on the calendar to see its figures here.</p>
+      <div id="dayDetailContent" style="display:none">
+        <div class="fw-semibold mb-1" id="ddDate"></div>
+        <div class="small text-muted mb-3" id="ddRange"></div>
+
+        <table class="table table-sm mb-2">
+          <thead><tr><th></th><th class="text-end">Day</th><th class="text-end">Week</th><th class="text-end">Month</th></tr></thead>
+          <tbody>
+            <tr><td>Branch Receipt</td><td class="text-end" id="brDay"></td><td class="text-end" id="brWeek"></td><td class="text-end" id="brMonth"></td></tr>
+            <tr><td>RQC Completed</td><td class="text-end" id="rqcDay"></td><td class="text-end" id="rqcWeek"></td><td class="text-end" id="rqcMonth"></td></tr>
+          </tbody>
+        </table>
+        <div class="small text-muted" id="ddQuality"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .sp-cal-day { cursor: pointer; height: 48px; vertical-align: middle; }
+  .sp-cal-day:hover { background: #f1f5f9; }
+  .sp-cal-has-data { background: #eef6ff; font-weight: 600; }
+  .sp-cal-today { outline: 2px solid var(--sp-navy); }
+  .sp-cal-day.sp-cal-selected { background: var(--sp-navy) !important; color: #fff; }
+</style>
+
+<script>
+(function () {
+  const dayDetailUrlTemplate = "{% url 'dashboard:operational_day_detail_json' project.pk '0000-00-00' %}";
+  const dayCells = document.querySelectorAll(".sp-cal-day");
+  const placeholder = document.getElementById("dayDetailPlaceholder");
+  const content = document.getElementById("dayDetailContent");
+  const fmt = (n) => (n === null || n === undefined) ? "—" : Number(n).toLocaleString(undefined, {maximumFractionDigits: 2});
+
+  dayCells.forEach(function (cell) {
+    cell.addEventListener("click", function () {
+      dayCells.forEach((c) => c.classList.remove("sp-cal-selected"));
+      cell.classList.add("sp-cal-selected");
+
+      const date = cell.getAttribute("data-date");
+      const url = dayDetailUrlTemplate.replace("0000-00-00", date);
+      fetch(url)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.error) { return; }
+          placeholder.style.display = "none";
+          content.style.display = "block";
+
+          document.getElementById("ddDate").textContent = data.date;
+          document.getElementById("ddRange").textContent =
+            "Week: " + data.week_start + " to " + data.week_end +
+            "  ·  Month: " + data.month_start + " to " + data.month_end;
+
+          document.getElementById("brDay").textContent = fmt(data.branch_receipt.day);
+          document.getElementById("brWeek").textContent = fmt(data.branch_receipt.week);
+          document.getElementById("brMonth").textContent = fmt(data.branch_receipt.month);
+
+          document.getElementById("rqcDay").textContent = fmt(data.rqc_completed.day);
+          document.getElementById("rqcWeek").textContent = fmt(data.rqc_completed.week);
+          document.getElementById("rqcMonth").textContent = fmt(data.rqc_completed.month);
+
+          document.getElementById("ddQuality").textContent =
+            data.rqc_quality_score !== null && data.rqc_quality_score !== undefined
+              ? ("RQC Quality Score (overall average): " + fmt(data.rqc_quality_score))
+              : "RQC Quality Score: — (not configured for this project)";
+        });
+    });
+  });
+})();
+</script>
+
+{% endblock %}

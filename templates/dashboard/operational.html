@@ -1,0 +1,208 @@
+{% extends "base/base.html" %}
+{% load humanize %}
+{% block title %}Operational Dashboard - Swift Prosys{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Operational Dashboard</h4>
+  <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Production Dashboard</a>
+</div>
+
+<!-- CEO / MD EXECUTIVE SUMMARY: the whole portfolio condensed to one glance -
+     counts, not row-by-row detail - plus the handful of projects that
+     actually need a call today, ranked by alert severity (see
+     views.operational's risk_weight). This strip is deliberately the ONLY
+     thing an MD needs to read before deciding whether to open the table
+     below at all. -->
+<div class="sp-panel mb-3" style="border-left: 4px solid var(--sp-navy)">
+  <h6 class="mb-2">Executive Summary</h6>
+  <div class="row g-2 g-md-3 mb-2">
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-navy">
+        <div class="kpi-label">Projects Tracked</div>
+        <div class="kpi-value">{{ exec_summary.total_projects }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-green">
+        <div class="kpi-label">On Track</div>
+        <div class="kpi-value">{{ exec_summary.clean_count }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-yellow">
+        <div class="kpi-label">Yellow Alerts</div>
+        <div class="kpi-value">{{ exec_summary.yellow_count }}</div>
+      </div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="kpi-card kpi-orange">
+        <div class="kpi-label">Red Alerts</div>
+        <div class="kpi-value">{{ exec_summary.red_count }}</div>
+      </div>
+    </div>
+  </div>
+  {% if exec_summary.top_at_risk %}
+  <p class="small text-muted mb-1 mt-2">Needs attention today:</p>
+  <ul class="mb-0 small">
+    {% for r in exec_summary.top_at_risk %}
+    <li>
+      <a href="{% url 'projects:insights' r.project.pk %}">{{ r.project.project_name }}</a>
+      — {{ r.alert_count }} alert{{ r.alert_count|pluralize }}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="small text-muted mb-0">No projects currently breaching a variance threshold. 🎉</p>
+  {% endif %}
+</div>
+
+<!-- FILTERS -->
+<form method="get" class="d-flex flex-wrap gap-2 mb-3">
+  {% if show_branch_filter %}
+  <select name="branch" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+    <option value="">All Branches</option>
+    {% for b in branches %}
+    <option value="{{ b.code }}" {% if selected_branch == b.code %}selected{% endif %}>{{ b.name }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+  {% if show_project_filter %}
+  <select name="project" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+    <option value="">All Projects</option>
+    {% for p in all_projects %}
+    <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
+    {% endfor %}
+  </select>
+  {% endif %}
+</form>
+
+<!-- TABLE / CALENDAR TOGGLE - the table below stays the default view;
+     "Calendar View" is per-project (pick one from "All Projects" above
+     first), so it only links out once a specific project is selected. -->
+<div class="d-flex align-items-center gap-2 mb-3">
+  <span class="btn btn-sm disabled" style="background: var(--sp-navy); color: #fff;">Table View</span>
+  {% if selected_project %}
+  <a href="{% url 'dashboard:operational_calendar' selected_project %}" class="btn btn-sm btn-outline-secondary">Calendar View</a>
+  {% else %}
+  <span class="btn btn-sm btn-outline-secondary disabled" title="Pick a specific project above first">Calendar View (pick a project above)</span>
+  {% endif %}
+</div>
+
+<!-- PROJECT-LEVEL OPERATIONAL TABLE -->
+<div class="sp-panel">
+  <h6>Project-Level Operational Review</h6>
+  <div class="table-responsive">
+    <table class="table table-hover table-sm align-middle">
+      <thead>
+        <tr>
+          <th>Project</th>
+          <th>Monthly<br>Plan</th>
+          <th>Weekly<br>Plan</th>
+          <th>PM / GM / PL</th>
+          <th>Daily Branch<br>Receipt</th>
+          <th>Daily RQC<br>Completed</th>
+          <th>Expected<br>Throughput</th>
+          <th>Current<br>Throughput</th>
+          <th>Target<br>Status</th>
+          <th>Headcount<br>Branch / In-house</th>
+          <th>Variance<br>Against Plan</th>
+          <th>Planned<br>Run Rate</th>
+          <th>Current<br>Run Rate</th>
+          <th>RQC Quality<br>Score</th>
+          <th>Required<br>Headcount</th>
+          <th>Alerts</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+        {% with p=row.panel %}
+        <tr>
+          <td>
+            <a href="{% url 'projects:insights' p.project.pk %}" class="fw-semibold text-decoration-none">{{ p.project.project_name }}</a>
+            <a href="{% url 'dashboard:operational_calendar' p.project.pk %}" class="ms-1 small text-muted text-decoration-none" title="Calendar view">📅</a>
+          </td>
+          <td>{{ p.monthly_plan|default:"—" }}</td>
+          <td>{{ p.weekly_plan|default:"—" }}</td>
+          <td class="small">{{ p.pm_name|default:"—" }} / {{ p.gm_name|default:"—" }} / {{ p.pl_name|default:"—" }}</td>
+          <td>
+            {% if p.branch_receipt is not None %}
+              <div class="fw-semibold">{{ p.branch_receipt|floatformat:0|intcomma }}</div>
+              {% if p.branch_receipt_target %}
+                <div class="small text-muted" style="font-size: 0.72rem;">
+                  Tgt: {{ p.branch_receipt_target|floatformat:0|intcomma }}
+                  {% if p.branch_receipt_achieved %}
+                    <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
+                  {% else %}
+                    <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          <td>
+            {% if p.rqc_completed is not None %}
+              <div class="fw-semibold">{{ p.rqc_completed|floatformat:0|intcomma }}</div>
+              {% if p.rqc_target %}
+                <div class="small text-muted" style="font-size: 0.72rem;">
+                  Tgt: {{ p.rqc_target|floatformat:0|intcomma }}
+                  {% if p.rqc_achieved %}
+                    <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
+                  {% else %}
+                    <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ p.expected_throughput|floatformat:0|intcomma|default:"—" }}</td>
+          <td>{{ p.current_throughput|floatformat:0|intcomma|default:"—" }}</td>
+          <td>
+            {% if p.target_achieved_status is not None %}
+              {% if p.target_achieved_status %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Achieved</span>
+              {% else %}
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Not Achieved</span>
+              {% endif %}
+            {% else %}
+              <span class="text-muted">—</span>
+            {% endif %}
+          </td>
+          <td>{{ p.headcount_branch|default:"—" }} / {{ p.headcount_inhouse|default:"—" }}</td>
+          <td class="{% if p.variance_vs_plan < 0 %}text-danger{% elif p.variance_vs_plan > 0 %}text-success{% endif %}">
+            {% if p.variance_vs_plan is not None %}{% if p.variance_vs_plan >= 0 %}+{% endif %}{{ p.variance_vs_plan|floatformat:0|intcomma }}{% else %}—{% endif %}
+          </td>
+          <td>{{ p.planned_run_rate|floatformat:0|intcomma|default:"—" }}</td>
+          <td>{{ p.current_run_rate|floatformat:0|intcomma|default:"—" }}</td>
+          <td>{{ p.rqc_quality_score|default:"—" }}{% if p.rqc_quality_score %}%{% endif %}</td>
+          <td>{{ p.required_headcount|default:"—" }}</td>
+          <td>
+            {% for alert in row.alerts %}
+            <span class="badge {% if alert.level == 'red' %}bg-danger{% else %}bg-warning text-dark{% endif %} d-block mb-1" title="{{ alert.message }}">
+              {{ alert.type }}
+            </span>
+            {% empty %}
+            <span class="badge bg-success">OK</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="15" class="text-center text-muted py-4">No projects to show.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="small text-muted mt-2 mb-0">
+    Daily Branch Receipt / RQC Completed / RQC Quality Score come from that project template's
+    <code>daily_metrics</code> mapping (date column + value column, in Template Mapping's JSON config) when set, or
+    from a column picked once per project on that project's Insights page as a fallback. Expected/Current
+    Throughput, Headcount and Run Rate come straight from that project's "Project Insights" / "AI for This month"
+    sheets — a project whose file doesn't have those tabs yet shows "—" until it does.
+  </p>
+</div>
+
+{% endblock %}

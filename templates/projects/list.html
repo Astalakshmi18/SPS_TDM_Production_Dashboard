@@ -43,6 +43,7 @@
         <tr>
           <th>Project</th>
           <th>Branch</th>
+          <th>Leadership (GM / PM / PL)</th>
           <th>Target</th>
           <th>Delivered</th>
           <th>Delivery %</th>
@@ -57,6 +58,14 @@
             <a href="{% url 'projects:detail' p.pk %}" class="fw-bold text-decoration-none text-navy fs-6">{{ p.project_name }}</a>
           </td>
           <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ p.branch.code }}</span></td>
+          <td>
+            <div class="d-flex flex-column gap-1" style="font-size: 0.72rem;">
+              {% if p.gm_name %}<span><strong class="text-secondary">GM:</strong> {{ p.gm_name }}</span>{% endif %}
+              {% if p.pm_name %}<span><strong class="text-primary">PM:</strong> {{ p.pm_name }}</span>{% endif %}
+              {% if p.pl_name %}<span><strong class="text-warning">PL:</strong> {{ p.pl_name }}</span>{% endif %}
+              {% if not p.gm_name and not p.pm_name and not p.pl_name %}<span class="text-muted">&mdash;</span>{% endif %}
+            </div>
+          </td>
           <td class="fw-semibold">{{ p.target_records|floatformat:0 }}</td>
           <td class="fw-semibold text-success">{{ p.delivered_records|floatformat:0 }}</td>
           <td>
@@ -84,7 +93,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="7" class="text-muted text-center py-4">No projects found.</td></tr>
+        <tr><td colspan="8" class="text-muted text-center py-4">No projects found.</td></tr>
         {% endfor %}
       </tbody>
     </table>

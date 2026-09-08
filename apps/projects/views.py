@@ -9,6 +9,7 @@ from django.core.files.storage import default_storage
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -56,6 +57,29 @@ def project_list(request):
 AUTO_SYNC_THROTTLE_SECONDS = 300
 
 
+def _get_daily_metrics_context(project):
+    daily_metrics_qs = project.daily_operational_metrics.values("date", "metric_key", "value")
+    daily_metrics_map = {}
+    for row in daily_metrics_qs:
+        d = row["date"].isoformat()
+        if d not in daily_metrics_map:
+            daily_metrics_map[d] = {"branch_receipt": 0.0, "rqc_completed": 0.0}
+        if row["metric_key"] == "branch_receipt":
+            daily_metrics_map[d]["branch_receipt"] = row["value"]
+        elif row["metric_key"] == "rqc_completed":
+            daily_metrics_map[d]["rqc_completed"] = row["value"]
+
+    latest_metric = project.daily_operational_metrics.order_by("-date").first()
+    latest_metric_date = latest_metric.date.isoformat() if latest_metric else ""
+
+    return {
+        "daily_metrics_json": json.dumps(daily_metrics_map),
+        "latest_metric_date": latest_metric_date,
+        "project_start_iso": project.start_date.isoformat() if project.start_date else "",
+        "project_end_iso": project.end_date.isoformat() if project.end_date else "",
+    }
+
+
 @login_required
 def project_detail(request, pk):
     project = get_object_or_404(accessible_projects(request), pk=pk)
@@ -80,12 +104,155 @@ def project_detail(request, pk):
         webhook_url = request.build_absolute_uri(
             f"/projects/webhook/{project.pk}/{project.sync_token}/"
         )
-    return render(request, "projects/detail.html", {
+
+    months = project.weekly_delivery_plan()
+    weekly_rows = []
+    total_monthly_plan = 0
+    total_monthly_actual = 0
+    total_monthly_variance = 0
+
+    for m in months:
+        p = m["monthly_plan"] or 0
+        a = m["monthly_actual"] or 0
+        v = m["monthly_variance"] or 0
+        total_monthly_plan += p
+        total_monthly_actual += a
+        total_monthly_variance += v
+        if p > 0:
+            m["display_variance_pct"] = round((v / p) * 100, 1)
+        else:
+            m["display_variance_pct"] = 0.0
+
+        for w in m["weeks"]:
+            wp = w.plan_records or 0
+            wa = w.actual_records or 0
+            wv = w.variance or 0
+            if wp > 0:
+                w.display_variance_pct = round((wv / wp) * 100, 1)
+            else:
+                w.display_variance_pct = 0.0
+            weekly_rows.append({"month_label": m["month_label"], "week": w})
+
+    monthly_totals = {
+        "plan": total_monthly_plan,
+        "actual": total_monthly_actual,
+        "variance": total_monthly_variance,
+        "variance_pct": round((total_monthly_variance / total_monthly_plan * 100), 1) if total_monthly_plan > 0 else 0.0,
+    }
+
+    monthly_chart = {
+        "labels": [m["month_label"] for m in months],
+        "plan": [m["monthly_plan"] for m in months],
+        "actual": [m["monthly_actual"] for m in months],
+    }
+    weekly_chart = {
+        "labels": [f'{r["month_label"]} {r["week"].week_label}' for r in weekly_rows],
+        "plan": [r["week"].plan_records for r in weekly_rows],
+        "actual": [r["week"].actual_records for r in weekly_rows],
+    }
+
+    if request.method == "POST" and hasattr(request.user, "profile") and request.user.profile.can_edit_projects:
+        delivered_col = request.POST.get("delivered_column_key", "").strip()
+        received_col = request.POST.get("received_column_key", "").strip()
+        project.delivered_column_key = delivered_col
+        project.received_column_key = received_col
+
+        if "batches_status_column_key" in request.POST:
+            project.batches_status_column_key = request.POST.get("batches_status_column_key", "").strip()
+            project.batches_keyed_value = request.POST.get("batches_keyed_value", "").strip()
+            project.batches_end_date_column_key = request.POST.get("batches_end_date_column_key", "").strip()
+
+        if "branch_receipt_column_key" in request.POST or "rqc_completed_column_key" in request.POST or "rqc_quality_column_key" in request.POST:
+            project.branch_receipt_column_key = request.POST.get("branch_receipt_column_key", "").strip()
+            project.rqc_completed_column_key = request.POST.get("rqc_completed_column_key", "").strip()
+            project.rqc_quality_column_key = request.POST.get("rqc_quality_column_key", "").strip()
+
+        project.save(update_fields=[
+            "delivered_column_key", "received_column_key",
+            "batches_status_column_key", "batches_keyed_value", "batches_end_date_column_key",
+            "branch_receipt_column_key", "rqc_completed_column_key", "rqc_quality_column_key",
+        ])
+        messages.success(request, "Selected columns saved.")
+        return redirect("projects:detail", pk=pk)
+
+    weekly_totals = {
+        "plan": sum((r["week"].plan_records or 0) for r in weekly_rows),
+        "actual": sum((r["week"].actual_records or 0) for r in weekly_rows),
+        "variance": sum((r["week"].variance or 0) for r in weekly_rows),
+    }
+    weekly_totals["variance_pct"] = (
+        round((weekly_totals["variance"] / weekly_totals["plan"]) * 100, 1) if weekly_totals["plan"] > 0 else 0.0
+    )
+
+    cps = {c["label"]: c for c in project.milestone_shipment_checkpoints()}
+    detailed_milestones = []
+    today = timezone.localdate()
+    for m in project.milestones():
+        lbl = m["label"]
+        target_pct = m["expected_pct"]
+        m_date = m["date"]
+        cp = cps.get(lbl)
+        pct_by = cp["pct_by"] if cp else (project.delivery_percent if lbl == "IDX Start" else 0.0)
+        cp_status = cp["status"] if cp else m["status"]
+
+        if lbl == "IDX Start" or pct_by >= target_pct:
+            cat_key = "met"
+            cat_badge = "Met"
+            cat_label = "Milestone Met"
+        elif today <= m_date:
+            if cp_status == "green":
+                cat_key = "ontrack"
+                cat_badge = "On Track"
+                cat_label = "Future Milestone – On Track"
+            else:
+                cat_key = "atrisk"
+                cat_badge = "At Risk"
+                cat_label = "Future Milestone – At Risk"
+        else:
+            if project.delivery_percent >= target_pct:
+                cat_key = "latecomplete"
+                cat_badge = "Complete"
+                cat_label = "Milestone Missed – Now Complete"
+            else:
+                cat_key = "missed"
+                cat_badge = "Missed"
+                cat_label = "Milestone Missed – Incomplete"
+
+        detailed_milestones.append({
+            "label": lbl,
+            "date": m_date,
+            "expected_pct": target_pct,
+            "pct_by": pct_by,
+            "actual_pct": project.delivery_percent,
+            "category": cat_key,
+            "cat_badge": cat_badge,
+            "cat_label": cat_label,
+            "reached": today >= m_date,
+            "status": cp_status,
+        })
+
+    ctx = {
         "project": project,
-        "milestones": project.milestones(),
+        "milestones": detailed_milestones,
+        "milestones_completed_count": sum(1 for m in detailed_milestones if m["category"] in ("met", "latecomplete")),
         "webhook_url": webhook_url,
         "batches_keying": project.batches_keying_panel(),
-    })
+        "weekly_delivery_plan": months,
+        "months": months,
+        "weekly_rows": weekly_rows,
+        "monthly_chart_json": json.dumps(monthly_chart),
+        "weekly_chart_json": json.dumps(weekly_chart),
+        "column_choices": project.inventory_column_choices(),
+        "project_status": project.project_status_panel(),
+        "branch_status": project.branch_status_panel(),
+        "batches_status_values": project.batch_status_values(),
+        "operational": project.operational_panel(),
+        "operational_alerts": project.operational_alerts(),
+        "monthly_totals": monthly_totals,
+        "weekly_totals": weekly_totals,
+    }
+    ctx.update(_get_daily_metrics_context(project))
+    return render(request, "projects/detail.html", ctx)
 
 
 @role_required(UserProfile.ROLE_ADMIN, UserProfile.ROLE_MANAGER, UserProfile.ROLE_PL, UserProfile.ROLE_PM)
@@ -222,11 +389,7 @@ def gsheet_webhook(request, pk, token):
 
 @login_required
 def project_insights(request, pk):
-    """Everything the mapping engine found that isn't one of the core
-    dashboard fields - kept off the main Dashboard on purpose so that stays
-    scannable, but nothing gets silently dropped. Also hosts the Project
-    Status / Branch Status panels and the Selected_Column dropdowns that
-    drive them."""
+    """Merged into project_detail - redirects to the unified dashboard."""
     project = get_object_or_404(accessible_projects(request), pk=pk)
 
     if request.method == "POST" and hasattr(request.user, "profile") and request.user.profile.can_edit_projects:
@@ -240,20 +403,55 @@ def project_insights(request, pk):
             project.batches_keyed_value = request.POST.get("batches_keyed_value", "").strip()
             project.batches_end_date_column_key = request.POST.get("batches_end_date_column_key", "").strip()
 
+        if "branch_receipt_column_key" in request.POST or "rqc_completed_column_key" in request.POST or "rqc_quality_column_key" in request.POST:
+            project.branch_receipt_column_key = request.POST.get("branch_receipt_column_key", "").strip()
+            project.rqc_completed_column_key = request.POST.get("rqc_completed_column_key", "").strip()
+            project.rqc_quality_column_key = request.POST.get("rqc_quality_column_key", "").strip()
+
         project.save(update_fields=[
             "delivered_column_key", "received_column_key",
             "batches_status_column_key", "batches_keyed_value", "batches_end_date_column_key",
+            "branch_receipt_column_key", "rqc_completed_column_key", "rqc_quality_column_key",
         ])
         messages.success(request, "Selected columns saved.")
-        return redirect("projects:insights", pk=pk)
 
-    return render(request, "projects/insights.html", {
+    return redirect("projects:detail", pk=pk)
+
+
+@login_required
+def weekly_delivery_report(request, pk):
+    """Monthly Plan vs Shipped / Weekly Plan vs Shipped report for one
+    project (table + chart) - built entirely from Project.
+    weekly_delivery_plan() (already grouped by month, with each month's own
+    week rows), same data that already backs the Weekly Delivery Plan
+    accordion on the project detail page and the homepage's monthly
+    summary - this just re-presents it as a dedicated report with charts."""
+    project = get_object_or_404(accessible_projects(request), pk=pk)
+    months = project.weekly_delivery_plan()
+
+    weekly_rows = []
+    for m in months:
+        for w in m["weeks"]:
+            weekly_rows.append({"month_label": m["month_label"], "week": w})
+
+    monthly_chart = {
+        "labels": [m["month_label"] for m in months],
+        "plan": [m["monthly_plan"] for m in months],
+        "actual": [m["monthly_actual"] for m in months],
+    }
+    weekly_chart = {
+        "labels": [f'{r["month_label"]} {r["week"].week_label}' for r in weekly_rows],
+        "plan": [r["week"].plan_records for r in weekly_rows],
+        "actual": [r["week"].actual_records for r in weekly_rows],
+    }
+
+    return render(request, "projects/weekly_report.html", {
         "project": project,
-        "column_choices": project.inventory_column_choices(),
-        "project_status": project.project_status_panel(),
-        "branch_status": project.branch_status_panel(),
-        "batches_status_values": project.batch_status_values(),
-        "batches_keying": project.batches_keying_panel(),
+        "all_projects": accessible_projects(request),
+        "months": months,
+        "weekly_rows": weekly_rows,
+        "monthly_chart_json": json.dumps(monthly_chart),
+        "weekly_chart_json": json.dumps(weekly_chart),
     })
 
 
@@ -305,10 +503,20 @@ def project_upload(request):
                     messages.error(request, f"Google Sheet import failed: {exc}")
                     return redirect("projects:upload")
 
-                project, errors = run_import(
-                    template, full_path, sheet_url, request.user,
-                    source_type=ImportBatch.SOURCE_GOOGLE_SHEET, source_url=sheet_url,
-                )
+                try:
+                    project, errors = run_import(
+                        template, full_path, sheet_url, request.user,
+                        source_type=ImportBatch.SOURCE_GOOGLE_SHEET, source_url=sheet_url,
+                    )
+                finally:
+                    # Same cleanup as resync_project() in import_engine.py -
+                    # this is a disposable temp download, not a file any
+                    # model keeps a live reference to.
+                    import os
+                    try:
+                        os.remove(full_path)
+                    except OSError:
+                        pass
             else:
                 excel_file = request.FILES.get("excel_file")
                 if not excel_file:
@@ -345,6 +553,7 @@ PROJECT_FORM_FIELDS = [
     "target_records", "delivered_records", "total_images",
     "total_batches", "batches_being_keyed", "promoted",
     "language", "vendor", "event_type", "ocr_status",
+    "gm_name", "pm_name", "pl_name",
 ]
 
 
@@ -378,6 +587,9 @@ def project_create(request):
                 vendor=data.get("vendor", ""),
                 event_type=data.get("event_type", ""),
                 ocr_status=data.get("ocr_status", ""),
+                gm_name=data.get("gm_name", "").strip(),
+                pm_name=data.get("pm_name", "").strip(),
+                pl_name=data.get("pl_name", "").strip(),
                 google_sheet_url=data.get("google_sheet_url", "").strip(),
             )
             messages.success(request, f"Project '{project.project_name}' created.")
@@ -418,6 +630,9 @@ def project_edit(request, pk):
             project.vendor = data.get("vendor", "")
             project.event_type = data.get("event_type", "")
             project.ocr_status = data.get("ocr_status", "")
+            project.gm_name = data.get("gm_name", "").strip()
+            project.pm_name = data.get("pm_name", "").strip()
+            project.pl_name = data.get("pl_name", "").strip()
             project.google_sheet_url = data.get("google_sheet_url", "").strip()
             project.save()
             messages.success(request, f"Project '{project.project_name}' updated.")

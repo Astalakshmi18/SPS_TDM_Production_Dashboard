@@ -212,9 +212,64 @@ def _detect_mapping_inner(xls_path: str, wb) -> dict:
             "end_date": {"mode": "cell", "sheet": "Project Summary", "cell": "F1"},
             "target": {"mode": "cell", "sheet": "Project Summary", "cell": "B2"},
             "delivered": {"mode": "cell", "sheet": "Project Summary", "cell": "B4"},
+            # Version Control's row-2 headers ("Prepapred by" / "Approved by"
+            # / "PL Name") over row-3+ data rows, one row per revision - row
+            # -1 (last non-blank entry) always picks the MOST RECENT
+            # revision's names, not the original row 3 one, so this stays
+            # correct as the sheet accumulates new versions over time.
+            "pm_name": {"mode": "header", "sheet": "Version Control", "column": "Prepapred by", "header_row": 2, "row": -1},
+            "gm_name": {"mode": "header", "sheet": "Version Control", "column": "Approved by", "header_row": 2, "row": -1},
+            "pl_name": {"mode": "header", "sheet": "Version Control", "column": "PL Name", "header_row": 2, "row": -1},
         }
         notes.append("Matched the standard PM02 'Project Summary' + 'Version Control' layout (high confidence).")
+        notes.append(
+            "GM/PM/PL read from the Version Control sheet's most recent row "
+            "(Approved by / Prepapred by / PL Name)."
+        )
         confidence = "high"
+
+        if "Project Insights" in wb.sheetnames:
+            # "Project Insights" has a "Months | Throughput (Branch, Inhouse)
+            # | Head Count (Branch, Inhouse)" table - "Branch"/"Inhouse"
+            # headers appear TWICE (once under Throughput, once under Head
+            # Count). pandas disambiguates repeated header text by appending
+            # ".1" to the second occurrence when it reads the header row, so
+            # "Branch.1"/"Inhouse.1" is how the Head Count pair is reached
+            # here - this only holds as long as Head Count stays the SECOND
+            # Branch/Inhouse pair on that row; row -1 picks the most recent
+            # month's entry, same "always latest" logic as PM/GM/PL above.
+            config["branch_manpower_count"] = {
+                "mode": "header", "sheet": "Project Insights", "column": "Branch.1", "header_row": 18, "row": -1,
+            }
+            config["inhouse_manpower_count"] = {
+                "mode": "header", "sheet": "Project Insights", "column": "Inhouse.1", "header_row": 18, "row": -1,
+            }
+            notes.append(
+                "Branch/Inhouse Manpower Count read from Project Insights' "
+                "'Head Count' table, most recent month's row."
+            )
+        else:
+            notes.append(
+                "No 'Project Insights' sheet found, so Branch/Inhouse "
+                "Manpower Count weren't mapped - add 'branch_manpower_count' "
+                "/ 'inhouse_manpower_count' rules manually if this project "
+                "tracks headcount elsewhere."
+            )
+
+        # Sheet name matched loosely (contains "weekly" and either
+        # "delivery" or "plan"), not an exact string, so a differently
+        # worded tab name on another project ("Weekly Plan", "Weekly
+        # Delivery Tracker", ...) is still found automatically.
+        weekly_sheet = next(
+            (s for s in wb.sheetnames if "weekly" in s.lower() and ("delivery" in s.lower() or "plan" in s.lower())),
+            None,
+        )
+        if weekly_sheet:
+            config["weekly_delivery_rows"] = {"sheet": weekly_sheet}
+            notes.append(
+                f"Weekly Delivery Plan (Monthly/Weekly Plan vs Actual Shipped, "
+                f"with Variance) mapped from the '{weekly_sheet}' sheet."
+            )
 
         images = _detect_images_source(wb)
         if images:

@@ -70,6 +70,18 @@
         <label class="form-label">OCR Status</label>
         <input name="ocr_status" class="form-control" value="{{ project.ocr_status|default:'' }}">
       </div>
+      <div class="col-md-4">
+        <label class="form-label">General Manager (GM)</label>
+        <input name="gm_name" class="form-control" value="{{ project.gm_name|default:'' }}" placeholder="e.g. Sreenivasulu">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Project Manager (PM)</label>
+        <input name="pm_name" class="form-control" value="{{ project.pm_name|default:'' }}" placeholder="e.g. Bhuvaneshwari G">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Project Lead (PL)</label>
+        <input name="pl_name" class="form-control" value="{{ project.pl_name|default:'' }}" placeholder="e.g. Gayathri J">
+      </div>
       <div class="col-md-12">
         <label class="form-label">Linked Google Sheet (optional — enables live sync)</label>
         <input type="url" name="google_sheet_url" class="form-control" value="{{ project.google_sheet_url|default:'' }}"

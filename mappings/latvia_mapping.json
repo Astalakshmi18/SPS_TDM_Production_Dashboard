@@ -89,6 +89,80 @@
         "record_count": "Accepted Records",
         "shipment_date": "Shipment"
       }
+    },
+    "weekly_delivery_rows": {
+      "sheet": "Weekly Delivery Plan"
+    },
+    "pm_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "Prepapred by",
+      "header_row": 2,
+      "row": -1
+    },
+    "gm_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "Approved by",
+      "header_row": 2,
+      "row": -1
+    },
+    "pl_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "PL Name",
+      "header_row": 2,
+      "row": -1
+    },
+    "branch_manpower_count": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Branch.1",
+      "header_row": 26,
+      "row": -1
+    },
+    "inhouse_manpower_count": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Inhouse.1",
+      "header_row": 26,
+      "row": -1
+    },
+    "throughput_branch": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Branch",
+      "header_row": 26,
+      "row": -1
+    },
+    "throughput_inhouse": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Inhouse",
+      "header_row": 26,
+      "row": -1
+    },
+    "quoted_throughput": {
+      "mode": "cell",
+      "sheet": "Project Insights",
+      "cell": "B17"
+    },
+    "daily_metrics": {
+      "branch_receipt": {
+        "sheet": "Inventory",
+        "date_column": "P",
+        "value_column": "R"
+      },
+      "rqc_completed": {
+        "sheet": "Inventory",
+        "date_column": "Y",
+        "value_column": "R"
+      },
+      "rqc_quality_score": {
+        "sheet": "Inventory",
+        "value_column": "AC",
+        "agg": "avg"
+      }
     }
   }
 }

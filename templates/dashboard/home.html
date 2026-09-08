@@ -63,7 +63,8 @@
     </div>
   </div>
   <div class="col-6 col-md-3">
-    <div class="kpi-card kpi-orange" title="Batches (files/folders) with a shipment date recorded - i.e. shipped out. Counts files, not records - a different unit than Delivered Records above.">
+    <div class="kpi-card kpi-orange"
+      title="Batches (files/folders) with a shipment date recorded - i.e. shipped out. Counts files, not records - a different unit than Delivered Records above.">
       <div class="kpi-label">Delivered Batches</div>
       <div class="kpi-value" data-kpi="promoted">{{ kpis.promoted|floatformat:0 }}</div>
     </div>
@@ -124,6 +125,92 @@
   </div>
 </div> -->
 
+<!-- Team & Manpower - standalone table, separate from the Milestone Table
+     below (GM/PM/PL + headcount per project; independent of Milestone's
+     own volume/timeline columns so neither table gets overly wide). -->
+<!-- <div class="sp-panel sp-project-detail-panel mb-3">
+  <div class="sp-pdt-header">
+    <div>
+      <h6 class="sp-pdt-title mb-0">Team &amp; Manpower</h6>
+    </div>
+  </div>
+  <div class="sp-table-scroll" tabindex="0" role="region" aria-label="Team and Manpower Table">
+    <table class="table table-hover align-middle sp-modern-table">
+      <thead>
+        <tr>
+          <th>Project Name</th>
+          <th>Branch</th>
+          <th>GM</th>
+          <th>PM</th>
+          <th>PL</th>
+          <th class="text-end">Branch Manpower</th>
+          <th class="text-end">Inhouse Manpower</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in project_table_rows %}
+        {% with p=row.project %}
+        <tr>
+          <td class="sp-project-name-cell"><a href="{% url 'projects:detail' p.pk %}" class="sp-project-link">{{ p.project_name }}</a></td>
+          <td><span class="sp-branch-chip">{{ p.branch.code }}</span></td>
+          <td class="text-muted">{{ p.gm_name|default:"—" }}</td>
+          <td class="text-muted">{{ p.pm_name|default:"—" }}</td>
+          <td class="text-muted">{{ p.pl_name|default:"—" }}</td>
+          <td class="text-end sp-num">{{ p.branch_manpower_count }}</td>
+          <td class="text-end sp-num">{{ p.inhouse_manpower_count }}</td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td class="text-muted" colspan="7">No projects yet</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div> -->
+
+<!-- Weekly Delivery Plan - monthly rollup per project (Monthly Plan vs
+     Achieved vs Variance, straight from each month's own "Total" row on
+     the sheet). Full week-by-week breakdown lives on each project's own
+     detail page - kept off the homepage to avoid a triple-nested table
+     here. -->
+<!-- <div class="sp-panel sp-project-detail-panel mb-3">
+  <div class="sp-pdt-header">
+    <div>
+      <h6 class="sp-pdt-title mb-0">Weekly Delivery Plan — Monthly Summary</h6>
+    </div>
+  </div>
+  <div class="sp-table-scroll" tabindex="0" role="region" aria-label="Weekly Delivery Plan Monthly Summary">
+    <table class="table table-hover align-middle sp-modern-table">
+      <thead>
+        <tr>
+          <th>Project Name</th>
+          <th>Month</th>
+          <th class="text-end">Monthly Plan</th>
+          <th class="text-end">Achieved</th>
+          <th class="text-end">Variance</th>
+          <th class="text-end">Variance %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in project_table_rows %}
+          {% for m in row.weekly_delivery_plan %}
+          <tr>
+            <td class="sp-project-name-cell"><a href="{% url 'projects:detail' row.project.pk %}" class="sp-project-link">{{ row.project.project_name }}</a></td>
+            <td>{{ m.month_label }}</td>
+            <td class="text-end sp-num">{{ m.monthly_plan|floatformat:0 }}</td>
+            <td class="text-end sp-num">{{ m.monthly_actual|floatformat:0 }}</td>
+            <td class="text-end sp-num {% if m.monthly_variance < 0 %}text-danger{% else %}text-success{% endif %}">{{ m.monthly_variance|floatformat:0 }}</td>
+            <td class="text-end sp-num">{{ m.monthly_variance_pct|floatformat:1 }}%</td>
+          </tr>
+          {% endfor %}
+        {% empty %}
+        <tr><td class="text-muted" colspan="6">No projects yet</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div> -->
+
 <!-- BOTTOM: project table (modernized presentation — same 17 columns, same
      Django variables/URLs/values as before; see dashboard.css "PROJECT
      DETAIL TABLE" block for the styling) -->
@@ -141,13 +228,18 @@
   <!-- Milestone status legend (5-state light badge style) -->
   <div class="sp-ms-legend5 mb-3" role="note" aria-label="Milestone status legend">
     <span class="sp-ms-legend5-item"><span class="ms-cell status-met">Met</span> Milestone Met</span>
-    <span class="sp-ms-legend5-item"><span class="ms-cell status-ontrack">On Track</span> Future Milestone – On Track</span>
-    <span class="sp-ms-legend5-item"><span class="ms-cell status-atrisk">At Risk</span> Future Milestone – At Risk</span>
-    <span class="sp-ms-legend5-item"><span class="ms-cell status-latecomplete">Complete</span> Milestone Missed – Now Complete</span>
-    <span class="sp-ms-legend5-item"><span class="ms-cell status-missed">Missed</span> Milestone Missed – Incomplete</span>
+    <span class="sp-ms-legend5-item"><span class="ms-cell status-ontrack">On Track</span> Future Milestone – On
+      Track</span>
+    <span class="sp-ms-legend5-item"><span class="ms-cell status-atrisk">At Risk</span> Future Milestone – At
+      Risk</span>
+    <span class="sp-ms-legend5-item"><span class="ms-cell status-latecomplete">Complete</span> Milestone Missed – Now
+      Complete</span>
+    <span class="sp-ms-legend5-item"><span class="ms-cell status-missed">Missed</span> Milestone Missed –
+      Incomplete</span>
   </div>
 
-  <div class="sp-table-scroll" tabindex="0" role="region" aria-label="Project Detail Table — scroll horizontally for more columns">
+  <div class="sp-table-scroll" tabindex="0" role="region"
+    aria-label="Project Detail Table — scroll horizontally for more columns">
     <table class="table table-hover align-middle sp-modern-table" id="projectTable">
       <thead>
         <tr class="sp-thead-group">
@@ -195,47 +287,45 @@
           {% with cp=row.cp10 target_pct=10 %}
           <td>
             {% if cp %}
-              {% if cp.pct_by >= target_pct %}
-                <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-              {% elif today <= cp.date %}
-                {% if cp.status == "green" %}
-                  <span class="ms-cell status-ontrack" title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+            {% if cp.pct_by >= target_pct %}
+            <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
+            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+              title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
-                {% if p.delivery_percent >= target_pct %}
-                  <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+              <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
               {% endif %}
-            {% else %}
+              {% else %}
+              {% if p.delivery_percent >= target_pct %}
+              <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
+              {% else %}
+              <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
+              {% endif %}
+              {% endif %}
+              {% else %}
               <span class="text-muted">—</span>
-            {% endif %}
+              {% endif %}
           </td>
           <td>
             <span class="sp-pctby-cell">
               {% if cp %}
-                {% if cp.pct_by >= target_pct %}
-                  <span class="status-dot status-met" title="Milestone Met"></span>
-                {% elif today <= cp.date %}
-                  {% if cp.status == "green" %}
-                    <span class="status-dot status-ontrack" title="Future Milestone – On Track"></span>
-                  {% else %}
-                    <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
-                  {% endif %}
-                {% else %}
-                  {% if p.delivery_percent >= target_pct %}
-                    <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
-                  {% else %}
-                    <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
-                  {% endif %}
-                {% endif %}
-              {% else %}
-                <span class="status-dot status-missed"></span>
-              {% endif %}
-              {{ cp.pct_by|default:"0" }}%
+              {% if cp.pct_by >= target_pct %}
+              <span class="status-dot status-met" title="Milestone Met"></span>
+              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+                title="Future Milestone – On Track"></span>
+            {% else %}
+            <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
+            {% endif %}
+            {% else %}
+            {% if p.delivery_percent >= target_pct %}
+            <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
+            {% else %}
+            <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
+            {% endif %}
+            {% endif %}
+            {% else %}
+            <span class="status-dot status-missed"></span>
+            {% endif %}
+            {{ cp.pct_by|default:"0" }}%
             </span>
           </td>
           {% endwith %}
@@ -243,47 +333,45 @@
           {% with cp=row.cp50 target_pct=50 %}
           <td>
             {% if cp %}
-              {% if cp.pct_by >= target_pct %}
-                <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-              {% elif today <= cp.date %}
-                {% if cp.status == "green" %}
-                  <span class="ms-cell status-ontrack" title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+            {% if cp.pct_by >= target_pct %}
+            <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
+            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+              title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
-                {% if p.delivery_percent >= target_pct %}
-                  <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+              <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
               {% endif %}
-            {% else %}
+              {% else %}
+              {% if p.delivery_percent >= target_pct %}
+              <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
+              {% else %}
+              <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
+              {% endif %}
+              {% endif %}
+              {% else %}
               <span class="text-muted">—</span>
-            {% endif %}
+              {% endif %}
           </td>
           <td>
             <span class="sp-pctby-cell">
               {% if cp %}
-                {% if cp.pct_by >= target_pct %}
-                  <span class="status-dot status-met" title="Milestone Met"></span>
-                {% elif today <= cp.date %}
-                  {% if cp.status == "green" %}
-                    <span class="status-dot status-ontrack" title="Future Milestone – On Track"></span>
-                  {% else %}
-                    <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
-                  {% endif %}
-                {% else %}
-                  {% if p.delivery_percent >= target_pct %}
-                    <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
-                  {% else %}
-                    <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
-                  {% endif %}
-                {% endif %}
-              {% else %}
-                <span class="status-dot status-missed"></span>
-              {% endif %}
-              {{ cp.pct_by|default:"0" }}%
+              {% if cp.pct_by >= target_pct %}
+              <span class="status-dot status-met" title="Milestone Met"></span>
+              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+                title="Future Milestone – On Track"></span>
+            {% else %}
+            <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
+            {% endif %}
+            {% else %}
+            {% if p.delivery_percent >= target_pct %}
+            <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
+            {% else %}
+            <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
+            {% endif %}
+            {% endif %}
+            {% else %}
+            <span class="status-dot status-missed"></span>
+            {% endif %}
+            {{ cp.pct_by|default:"0" }}%
             </span>
           </td>
           {% endwith %}
@@ -291,54 +379,54 @@
           {% with cp=row.cp100 target_pct=100 %}
           <td>
             {% if cp %}
-              {% if cp.pct_by >= target_pct %}
-                <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-              {% elif today <= cp.date %}
-                {% if cp.status == "green" %}
-                  <span class="ms-cell status-ontrack" title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+            {% if cp.pct_by >= target_pct %}
+            <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
+            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+              title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
-                {% if p.delivery_percent >= target_pct %}
-                  <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
-                {% else %}
-                  <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
-                {% endif %}
+              <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
               {% endif %}
-            {% else %}
+              {% else %}
+              {% if p.delivery_percent >= target_pct %}
+              <span class="ms-cell status-latecomplete" title="Milestone Missed – Now Complete">{{ cp.date|default:"—" }}</span>
+              {% else %}
+              <span class="ms-cell status-missed" title="Milestone Missed – Incomplete">{{ cp.date|default:"—" }}</span>
+              {% endif %}
+              {% endif %}
+              {% else %}
               <span class="text-muted">—</span>
-            {% endif %}
+              {% endif %}
           </td>
           <td>
             <span class="sp-pctby-cell">
               {% if cp %}
-                {% if cp.pct_by >= target_pct %}
-                  <span class="status-dot status-met" title="Milestone Met"></span>
-                {% elif today <= cp.date %}
-                  {% if cp.status == "green" %}
-                    <span class="status-dot status-ontrack" title="Future Milestone – On Track"></span>
-                  {% else %}
-                    <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
-                  {% endif %}
-                {% else %}
-                  {% if p.delivery_percent >= target_pct %}
-                    <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
-                  {% else %}
-                    <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
-                  {% endif %}
-                {% endif %}
-              {% else %}
-                <span class="status-dot status-missed"></span>
-              {% endif %}
-              {{ cp.pct_by|default:"0" }}%
+              {% if cp.pct_by >= target_pct %}
+              <span class="status-dot status-met" title="Milestone Met"></span>
+              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+                title="Future Milestone – On Track"></span>
+            {% else %}
+            <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
+            {% endif %}
+            {% else %}
+            {% if p.delivery_percent >= target_pct %}
+            <span class="status-dot status-latecomplete" title="Milestone Missed – Now Complete"></span>
+            {% else %}
+            <span class="status-dot status-missed" title="Milestone Missed – Incomplete"></span>
+            {% endif %}
+            {% endif %}
+            {% else %}
+            <span class="status-dot status-missed"></span>
+            {% endif %}
+            {{ cp.pct_by|default:"0" }}%
             </span>
           </td>
           {% endwith %}
 
-          <td><span class="sp-status-badge sp-status-{{ p.status }}"><span class="status-dot status-{{ p.status }}"></span>{{ p.status|title }}</span></td>
+          <td><span class="sp-status-badge sp-status-{{ p.status }}"><span
+                class="status-dot status-{{ p.status }}"></span>{{ p.status|title }}</span></td>
           <td class="text-center">
-            <a href="{% url 'projects:insights' p.pk %}" class="sp-info-btn" data-bs-toggle="tooltip" title="View Project Details" aria-label="View details for {{ p.project_name }}">
+            <a href="{% url 'projects:insights' p.pk %}" class="sp-info-btn" data-bs-toggle="tooltip"
+              title="View Project Details" aria-label="View details for {{ p.project_name }}">
               <i class="bi bi-info-circle"></i>
             </a>
           </td>
@@ -360,7 +448,16 @@
         <select name="branch" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All Branches</option>
           {% for b in branches %}
-            <option value="{{ b.code }}" {% if selected_branch == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
+          <option value="{{ b.code }}" {% if selected_branch == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}
+          </option>
+          {% endfor %}
+        </select>
+
+        <label class="form-label small">GM</label>
+        <select name="gm" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
+          <option value="">All GMs</option>
+          {% for gm in gms %}
+          <option value="{{ gm }}" {% if selected_gm == gm %}selected{% endif %}>{{ gm }}</option>
           {% endfor %}
         </select>
 
@@ -368,7 +465,7 @@
         <select name="project" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">All Projects</option>
           {% for p in all_projects %}
-            <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
+          <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
           {% endfor %}
         </select>
       </form>
@@ -385,9 +482,14 @@
               <td class="text-end fw-semibold">{{ m.count }}</td>
             </tr>
             {% empty %}
-            <tr><td class="text-muted" colspan="2">No projects yet</td></tr>
+            <tr>
+              <td class="text-muted" colspan="2">No projects yet</td>
+            </tr>
             {% endfor %}
-            <tr class="border-top"><td class="fw-bold">Total</td><td class="text-end fw-bold">{{ milestone_total }}</td></tr>
+            <tr class="border-top">
+              <td class="fw-bold">Total</td>
+              <td class="text-end fw-bold">{{ milestone_total }}</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -399,17 +501,18 @@
     <div class="sp-panel">
       <h6>Delivery &amp; Timeline Progress</h6>
       {% for p in projects %}
-        <div class="mb-3 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
-          <div class="d-flex justify-content-between flex-wrap gap-1">
-            <span class="fw-semibold"><span class="status-dot status-{{ p.status }}"></span>{{ p.project_name }} ({{ p.branch.code }})</span>
-            <span class="small text-muted">Delivery {{ p.delivery_percent }}% &nbsp;|&nbsp; Timeline {{ p.timeline_percent }}%</span>
-          </div>
-          <div class="progress mt-2">
-            <div class="progress-bar progress-bar-navy" style="width: {{ p.delivery_percent }}%"></div>
-          </div>
+      <div class="mb-3 pb-2 {% if not forloop.last %}border-bottom{% endif %}">
+        <div class="d-flex justify-content-between flex-wrap gap-1">
+          <span class="fw-semibold"><span class="status-dot status-{{ p.status }}"></span>{{ p.project_name }} ({{ p.branch.code }})</span>
+          <span class="small text-muted">Delivery {{ p.delivery_percent }}% &nbsp;|&nbsp; Timeline {{ p.timeline_percent }}%</span>
         </div>
+        <div class="progress mt-2">
+          <div class="progress-bar progress-bar-navy" style="width: {{ p.delivery_percent }}%"></div>
+        </div>
+      </div>
       {% empty %}
-        <p class="text-muted mb-0">No projects yet. <a href="{% url 'projects:upload' %}">Upload an Excel file</a> to get started.</p>
+      <p class="text-muted mb-0">No projects yet. <a href="{% url 'projects:upload' %}">Upload an Excel file</a> to get
+        started.</p>
       {% endfor %}
     </div>
 
@@ -446,44 +549,50 @@
 
 
 <script>
-const branchData = {{ branch_chart_json|safe }};
-const completionData = {{ completion_chart_json|safe }};
-const statusData = {{ status_chart_json|safe }};
+  const branchData = {{ branch_chart_json| safe }};
+  const completionData = {{ completion_chart_json| safe }};
+  const statusData = {{ status_chart_json| safe }};
 
-window.branchChart = new Chart(document.getElementById('branchChart'), {
-  type: 'bar',
-  data: { labels: branchData.labels, datasets: [
-    { label: 'Target', data: branchData.target, backgroundColor: '#0b1f3a' },
-    { label: 'Delivered', data: branchData.delivered, backgroundColor: '#14b8a6' },
-  ]},
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
-});
+  window.branchChart = new Chart(document.getElementById('branchChart'), {
+    type: 'bar',
+    data: {
+      labels: branchData.labels, datasets: [
+        { label: 'Target', data: branchData.target, backgroundColor: '#0b1f3a' },
+        { label: 'Delivered', data: branchData.delivered, backgroundColor: '#14b8a6' },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
 
-window.completionChart = new Chart(document.getElementById('completionChart'), {
-  type: 'doughnut',
-  data: { labels: ['Delivered', 'Remaining'], datasets: [{ data: [completionData.delivered, completionData.remaining],
-    backgroundColor: ['#22c55e', '#e5e9f2'] }] },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
-});
+  window.completionChart = new Chart(document.getElementById('completionChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Delivered', 'Remaining'], datasets: [{
+        data: [completionData.delivered, completionData.remaining],
+        backgroundColor: ['#22c55e', '#e5e9f2']
+      }]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
 
-window.statusChart = new Chart(document.getElementById('statusChart'), {
-  type: 'doughnut',
-  data: { labels: statusData.labels, datasets: [{ data: statusData.values, backgroundColor: statusData.colors }] },
-  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
-});
+  window.statusChart = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: { labels: statusData.labels, datasets: [{ data: statusData.values, backgroundColor: statusData.colors }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+  });
 
-// Project Detail Table: enable Bootstrap tooltips on milestone/info icons,
-// and highlight the row whose Info button was focused/clicked - purely
-// presentational, no data or navigation behavior is changed.
-document.querySelectorAll('#projectTable [data-bs-toggle="tooltip"]').forEach(function (el) {
-  new bootstrap.Tooltip(el);
-});
-document.querySelectorAll('#projectTable tbody tr').forEach(function (row) {
-  var infoBtn = row.querySelector('.sp-info-btn');
-  if (infoBtn) {
-    infoBtn.addEventListener('focus', function () { row.classList.add('sp-row-active'); });
-    infoBtn.addEventListener('blur', function () { row.classList.remove('sp-row-active'); });
-  }
-});
+  // Project Detail Table: enable Bootstrap tooltips on milestone/info icons,
+  // and highlight the row whose Info button was focused/clicked - purely
+  // presentational, no data or navigation behavior is changed.
+  document.querySelectorAll('#projectTable [data-bs-toggle="tooltip"]').forEach(function (el) {
+    new bootstrap.Tooltip(el);
+  });
+  document.querySelectorAll('#projectTable tbody tr').forEach(function (row) {
+    var infoBtn = row.querySelector('.sp-info-btn');
+    if (infoBtn) {
+      infoBtn.addEventListener('focus', function () { row.classList.add('sp-row-active'); });
+      infoBtn.addEventListener('blur', function () { row.classList.remove('sp-row-active'); });
+    }
+  });
 </script>
 {% endblock %}

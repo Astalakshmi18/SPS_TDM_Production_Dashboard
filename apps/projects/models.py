@@ -1,7 +1,10 @@
 import datetime
+import json
+import re
 import secrets
 
 from django.db import models
+from django.db.models import Sum
 from django.utils import timezone
 
 
@@ -41,6 +44,22 @@ class Project(models.Model):
     event_type = models.CharField(max_length=150, blank=True, default="")
     ocr_status = models.CharField(max_length=100, blank=True, default="")
 
+    # Team / ownership (Version Control sheet: "Approved by" = GM,
+    # "Prepapred by" = PM, "PL Name" = PL - read via the mapping engine,
+    # same as every other field). Free text, not a FK, since these are
+    # names typed into the sheet, not a separate People table.
+    gm_name = models.CharField("GM Name", max_length=150, blank=True, default="")
+    pm_name = models.CharField("PM Name", max_length=150, blank=True, default="")
+    pl_name = models.CharField("PL Name", max_length=150, blank=True, default="")
+
+    # Manpower counts. Not yet present in most project Google Sheets as of
+    # when these fields were added - default to 0 until a template's
+    # mapping config is updated to point at the real column once it exists
+    # on the sheet. Re-syncing afterward will then populate these normally,
+    # same as any other mapped field.
+    branch_manpower_count = models.PositiveIntegerField(default=0)
+    inhouse_manpower_count = models.PositiveIntegerField(default=0)
+
     # Everything the mapping engine pulled that isn't one of the fields above -
     # shown only on the Project Insights page, kept out of the main dashboard.
     extra_data = models.JSONField(default=dict, blank=True)
@@ -69,6 +88,16 @@ class Project(models.Model):
     delivered_column_key = models.CharField(max_length=150, blank=True, default="")
     received_column_key = models.CharField(max_length=150, blank=True, default="")
 
+    # Operational Dashboard (ops-review request): same "pick a column once
+    # from THIS project's own Inventory headers" pattern as delivered/
+    # received above. BPW's own file: Branch Rec. = column S, QC Records =
+    # column AC, Inhouse % = column AM - saved here as the column's literal
+    # header text (via inventory_column_choices()), not a fixed letter, so
+    # a differently-laid-out project just picks its own equivalent column.
+    branch_receipt_column_key = models.CharField(max_length=150, blank=True, default="")
+    rqc_completed_column_key = models.CharField(max_length=150, blank=True, default="")
+    rqc_quality_column_key = models.CharField(max_length=150, blank=True, default="")
+
     # Batches Being Processed dropdown: which Inventory column carries each
     # batch's keying status (e.g. "Keyed" / "WIP" / blank), and which value
     # in that column means "Keyed". Batches Being Processed = Total Batches
@@ -88,6 +117,13 @@ class Project(models.Model):
     # Python re-deriving pace/percentages that can drift from the sheet's
     # own "Exclude Sundays" and other business rules baked into the file.
     summary_snapshot = models.JSONField(default=dict, blank=True)
+
+    # Operational Dashboard snapshot: "Project Insights" + "AI for This
+    # month" sheets' OWN numbers (Quoted/Current Throughput, Branch/Inhouse
+    # Headcount, Current/Required Run Rate) - read directly at import time,
+    # same principle as summary_snapshot above. See
+    # import_engine.read_operational_snapshot().
+    operational_snapshot = models.JSONField(default=dict, blank=True)
 
     last_updated = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -163,6 +199,769 @@ class Project(models.Model):
             except (TypeError, ValueError):
                 continue
         return int(total) if total == int(total) else round(total, 2)
+
+    def _avg_inventory_column(self, column_key):
+        """Same column resolution as `_sum_inventory_column`, but AVERAGED
+        instead of summed - for a percentage/score-style column like BPW's
+        "Inhouse %" (RQC Quality Score), where the meaningful figure is the
+        typical value per row, not a sum that grows with row count. Values
+        already stored as a 0-1 fraction (e.g. Excel's own "%" cell format,
+        openpyxl often returns 0.97 rather than 97) are scaled up to a 0-100
+        number so they read the same as values already stored as e.g. 97 -
+        this is a heuristic (a genuine ratio-style field close to 1 would be
+        misread), acceptable here since this column is only ever used for a
+        %-typed field."""
+        if not column_key:
+            return None
+        if column_key in ("image_count", "record_count"):
+            agg = self.inventory_items.aggregate(avg=models.Avg(column_key))
+            return round(agg["avg"], 2) if agg["avg"] is not None else None
+        values = []
+        for extra in self.inventory_items.exclude(extra={}).values_list("extra", flat=True):
+            raw = extra.get(column_key)
+            if raw is None or raw == "":
+                continue
+            try:
+                v = float(str(raw).replace(",", "").replace("%", ""))
+            except (TypeError, ValueError):
+                continue
+            values.append(v * 100 if 0 < v <= 1 else v)
+        if not values:
+            return None
+        return round(sum(values) / len(values), 2)
+
+    def operational_plan_panel(self, cycle_month_start=None):
+        """Monthly Plan vs Monthly Target Achieved and Weekly Plan vs Weekly Target Achieved.
+        Finds the active month and week with delivery data (strictly defaulting to current
+        month period, with cycle_month_start override), and derives Plan, Target Achieved (Actual),
+        Gap, Gap %, and Achieved status - identically modeled to Throughput and Run Rate."""
+        today = timezone.localdate()
+        current_first = today.replace(day=1)
+        current_key = today.strftime("%Y-%m")
+        current_label = today.strftime("%B %Y")
+
+        month_row = None
+        if cycle_month_start:
+            if isinstance(cycle_month_start, (datetime.date, datetime.datetime)):
+                month_row = self.weekly_delivery_rows.filter(month_start=cycle_month_start, is_total=True).first()
+            else:
+                cms_str = str(cycle_month_start).strip()
+                parsed_d = None
+                try:
+                    if len(cms_str) == 7 and cms_str[4] == "-":
+                        parsed_d = datetime.date.fromisoformat(cms_str + "-01")
+                    elif len(cms_str) == 10 and cms_str[4] == "-" and cms_str[7] == "-":
+                        parsed_d = datetime.date.fromisoformat(cms_str)
+                except Exception:
+                    parsed_d = None
+
+                if parsed_d:
+                    month_row = self.weekly_delivery_rows.filter(month_start=parsed_d, is_total=True).first()
+
+                if not month_row:
+                    month_row = (
+                        self.weekly_delivery_rows.filter(month_label__iexact=cms_str, is_total=True).first()
+                        or self.weekly_delivery_rows.filter(month_label__icontains=cms_str, is_total=True).first()
+                    )
+        else:
+            # Strictly default to CURRENT MONTH first based on system date
+            month_row = self.weekly_delivery_rows.filter(month_start=current_first, is_total=True).first()
+
+        # If month_row is not found for the requested/default cycle:
+        if not month_row:
+            snap = self.operational_snapshot or {}
+            snap_cycles = snap.get("monthly_cycles") or []
+            cur_sc = None
+            if cycle_month_start:
+                cur_sc = next(
+                    (c for c in snap_cycles if c.get("month_key") == str(cycle_month_start) or c.get("month_label") == str(cycle_month_start)),
+                    None
+                )
+            if not cur_sc and not cycle_month_start:
+                cur_sc = next((c for c in snap_cycles if c.get("month_key") == current_key), None)
+
+            if cur_sc:
+                monthly_actual = cur_sc.get("target_achieved") or 0
+                monthly_plan = cur_sc.get("expected_throughput") or 0
+                monthly_gap = (monthly_actual - monthly_plan) if (monthly_plan or monthly_actual) else None
+                monthly_gap_pct = round((monthly_gap / monthly_plan * 100), 2) if (monthly_gap is not None and monthly_plan) else 0.0
+                monthly_achieved = bool(monthly_actual >= monthly_plan) if (monthly_plan and monthly_actual is not None) else None
+                return {
+                    "monthly_plan": monthly_plan,
+                    "monthly_actual": monthly_actual,
+                    "monthly_target_achieved": monthly_actual,
+                    "monthly_gap": monthly_gap,
+                    "monthly_gap_pct": monthly_gap_pct,
+                    "monthly_achieved": monthly_achieved,
+                    "monthly_status_label": "Achieved" if monthly_achieved else ("Not Achieved" if monthly_achieved is False else "—"),
+                    "monthly_label": cur_sc.get("month_label") or current_label,
+                    "weekly_plan": 0,
+                    "weekly_actual": 0,
+                    "weekly_target_achieved": 0,
+                    "weekly_gap": None,
+                    "weekly_gap_pct": 0.0,
+                    "weekly_achieved": None,
+                    "weekly_status_label": "—",
+                    "weekly_label": "",
+                }
+
+            # If user explicitly requested a specific past cycle that couldn't be matched:
+            if cycle_month_start and str(cycle_month_start) not in (str(current_first), current_key, current_label):
+                fallback_row = self.weekly_delivery_rows.filter(is_total=True).order_by("-month_start").first()
+                if fallback_row:
+                    month_row = fallback_row
+
+            # If still no month_row (e.g. current month doesn't have delivery row in sheet yet)
+            if not month_row:
+                return {
+                    "monthly_plan": 0,
+                    "monthly_actual": 0,
+                    "monthly_target_achieved": 0,
+                    "monthly_gap": None,
+                    "monthly_gap_pct": 0.0,
+                    "monthly_achieved": None,
+                    "monthly_status_label": "In Progress",
+                    "monthly_label": current_label,
+                    "weekly_plan": 0,
+                    "weekly_actual": 0,
+                    "weekly_target_achieved": 0,
+                    "weekly_gap": None,
+                    "weekly_gap_pct": 0.0,
+                    "weekly_achieved": None,
+                    "weekly_status_label": "—",
+                    "weekly_label": f"{current_label} Week-1",
+                }
+
+        # Find corresponding week row for this month
+        if month_row:
+            target_start = month_row.month_start
+            week_qs = self.weekly_delivery_rows.filter(month_start=target_start, is_total=False)
+            if target_start == current_first:
+                # In current month: pick active/current week
+                week_row = (
+                    week_qs.filter(shipment_date__gte=today).order_by("shipment_date").first()
+                    or week_qs.filter(shipment_date__lte=today).order_by("-shipment_date").first()
+                    or week_qs.first()
+                )
+            else:
+                # Past month: pick latest week
+                week_row = week_qs.order_by("-shipment_date").first()
+        else:
+            week_row = None
+
+        monthly_plan = month_row.plan_records if month_row else 0
+        monthly_actual = month_row.actual_records if month_row else 0
+        monthly_gap = (monthly_actual - monthly_plan) if (monthly_plan or monthly_actual) else None
+        monthly_gap_pct = round((monthly_gap / monthly_plan * 100), 2) if (monthly_gap is not None and monthly_plan) else 0.0
+        monthly_achieved = bool(monthly_actual >= monthly_plan) if (monthly_plan and monthly_actual is not None) else None
+        monthly_label = month_row.month_label if month_row else ""
+
+        weekly_plan = week_row.plan_records if week_row else 0
+        weekly_actual = week_row.actual_records if week_row else 0
+        weekly_gap = (weekly_actual - weekly_plan) if (weekly_plan or weekly_actual) else None
+        weekly_gap_pct = round((weekly_gap / weekly_plan * 100), 2) if (weekly_gap is not None and weekly_plan) else 0.0
+        weekly_achieved = bool(weekly_actual >= weekly_plan) if (weekly_plan and weekly_actual is not None) else None
+        weekly_label = f"{week_row.month_label} {week_row.week_label}".strip() if week_row else ""
+
+        return {
+            "monthly_plan": monthly_plan,
+            "monthly_actual": monthly_actual,
+            "monthly_target_achieved": monthly_actual,
+            "monthly_gap": monthly_gap,
+            "monthly_gap_pct": monthly_gap_pct,
+            "monthly_achieved": monthly_achieved,
+            "monthly_status_label": "Achieved" if monthly_achieved else ("Not Achieved" if monthly_achieved is False else "—"),
+            "monthly_label": monthly_label,
+
+            "weekly_plan": weekly_plan,
+            "weekly_actual": weekly_actual,
+            "weekly_target_achieved": weekly_actual,
+            "weekly_gap": weekly_gap,
+            "weekly_gap_pct": weekly_gap_pct,
+            "weekly_achieved": weekly_achieved,
+            "weekly_status_label": "Achieved" if weekly_achieved else ("Not Achieved" if weekly_achieved is False else "—"),
+            "weekly_label": weekly_label,
+        }
+
+    def operational_panel(self):
+        """Project-Level Operational Dashboard row (ops-review request):
+        Daily Branch Receipt / Daily RQC Completed / RQC Quality Score come
+        from whichever Inventory column is picked via
+        branch_receipt_column_key / rqc_completed_column_key /
+        rqc_quality_column_key above. Expected/Current Throughput,
+        Branch/Inhouse Headcount, Planned/Current Run Rate come straight
+        from operational_snapshot (the source sheets' own numbers - see
+        import_engine.read_operational_snapshot). Variance Against Plan =
+        Current Run Rate - Planned(Required) Run Rate. Required Headcount =
+        the headcount it would take, AT today's per-head productivity, to
+        hit the Planned Run Rate."""
+        snap = self.operational_snapshot or {}
+        plan = self.operational_plan_panel()
+
+        # Template-Mapping-configured daily figures (config["daily_metrics"]
+        # in the ProjectTemplate JSON - date column + value column, no
+        # per-project manual picking needed) take priority; the manual
+        # branch_receipt_column_key/rqc_completed_column_key/
+        # rqc_quality_column_key picker (set once via a project's Insights
+        # page) is only used as a fallback for a project whose template
+        # hasn't been given daily_metrics rules yet.
+        today = datetime.date.today()
+        # Daily metrics strictly reflect TODAY's actual numbers
+        today_receipt = self.daily_operational_metrics.filter(
+            date=today, metric_key=DailyOperationalMetric.METRIC_BRANCH_RECEIPT
+        ).first()
+        if today_receipt is not None:
+            branch_receipt = today_receipt.value
+        elif self.daily_operational_metrics.exists():
+            # If the project tracks daily metrics, but nothing has been logged for today yet, today's receipt is 0
+            branch_receipt = 0.0
+        else:
+            branch_receipt = snap.get("branch_receipt")
+            if branch_receipt is None and self.branch_receipt_column_key:
+                branch_receipt = self._sum_inventory_column(self.branch_receipt_column_key)
+
+        today_rqc = self.daily_operational_metrics.filter(
+            date=today, metric_key=DailyOperationalMetric.METRIC_RQC_COMPLETED
+        ).first()
+        if today_rqc is not None:
+            rqc_completed = today_rqc.value
+        elif self.daily_operational_metrics.exists():
+            rqc_completed = 0.0
+        else:
+            rqc_completed = snap.get("rqc_completed")
+            if rqc_completed is None and self.rqc_completed_column_key:
+                rqc_completed = self._sum_inventory_column(self.rqc_completed_column_key)
+
+        rqc_quality_score = snap.get("rqc_quality_score")
+        if rqc_quality_score is None and self.rqc_quality_column_key:
+            rqc_quality_score = self._avg_inventory_column(self.rqc_quality_column_key)
+        if rqc_quality_score is not None:
+            try:
+                rqc_val = float(rqc_quality_score)
+                if 0 < rqc_val <= 1.0:
+                    rqc_quality_score = round(rqc_val * 100.0, 2)
+                else:
+                    rqc_quality_score = round(rqc_val, 2)
+            except (ValueError, TypeError):
+                pass
+
+        # Throughput metrics:
+        # Expected Throughput = Quoted Throughput * Manpower used * Working Days
+        # Current Throughput = Target Achieved
+        # Target Achieved or not = (Current Throughput >= Expected Throughput)
+        quoted_throughput = snap.get("quoted_throughput")
+        manpower_used = snap.get("manpower_used")
+        working_days = snap.get("working_days")
+        target_achieved = snap.get("target_achieved")
+
+        # Defensive derivation for existing database snapshots before re-import:
+        if quoted_throughput is None:
+            if snap.get("expected_throughput") and snap.get("expected_throughput") < 10000:
+                quoted_throughput = snap.get("expected_throughput")
+            elif snap.get("throughput_branch"):
+                quoted_throughput = snap.get("throughput_branch")
+
+        if manpower_used is None:
+            manpower_used = snap.get("headcount_branch") or self.branch_manpower_count or None
+
+        if working_days is None:
+            working_days = snap.get("ai_month_working_days") or None
+
+        if target_achieved is None:
+            raw_curr = snap.get("current_throughput")
+            if raw_curr is not None:
+                if raw_curr < 10000 and manpower_used and working_days:
+                    target_achieved = round(raw_curr * manpower_used * working_days, 2)
+                else:
+                    target_achieved = raw_curr
+
+        if quoted_throughput and manpower_used and working_days:
+            expected_throughput = round(quoted_throughput * manpower_used * working_days, 2)
+        else:
+            expected_throughput = snap.get("expected_throughput")
+
+        if target_achieved is not None:
+            current_throughput = target_achieved
+        else:
+            current_throughput = snap.get("current_throughput")
+
+        target_achieved_status = None
+        target_achieved_label = "—"
+        throughput_gap = None
+        throughput_gap_pct = None
+        if expected_throughput is not None and current_throughput is not None:
+            target_achieved_status = bool(current_throughput >= expected_throughput)
+            target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
+            throughput_gap = round(current_throughput - expected_throughput, 2)
+            throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2) if expected_throughput else 0.0
+
+        headcount_branch = snap.get("headcount_branch")
+        headcount_inhouse = snap.get("headcount_inhouse")
+        planned_run_rate = snap.get("planned_run_rate")
+        current_run_rate = snap.get("current_run_rate")
+
+        run_rate_gap = (
+            round(current_run_rate - planned_run_rate, 2)
+            if planned_run_rate is not None and current_run_rate is not None else None
+        )
+        variance_vs_plan = run_rate_gap
+
+        run_rate_gap_pct = (
+            round((run_rate_gap / planned_run_rate) * 100, 2)
+            if run_rate_gap is not None and planned_run_rate else None
+        )
+
+        run_rate_achieved = (
+            bool(current_run_rate >= planned_run_rate)
+            if current_run_rate is not None and planned_run_rate is not None else None
+        )
+        run_rate_status_label = "Achieved" if run_rate_achieved else ("Not Achieved" if run_rate_achieved is False else "—")
+
+        required_headcount = None
+        branch_headcount = (headcount_branch if headcount_branch is not None else self.branch_manpower_count) or 0
+        if planned_run_rate and current_run_rate and branch_headcount:
+            per_head_productivity = current_run_rate / branch_headcount
+            if per_head_productivity:
+                required_headcount = round(planned_run_rate / per_head_productivity, 1)
+
+        # Branch Receipt Target = Branch Throughput (Per-day target) * Branch Manpower (Members working)
+        # Sourced dynamically from Template Mapping or Project Insights sheet (e.g. 650 * 40 = 26,000)
+        branch_tp = snap.get("throughput_branch") or quoted_throughput
+        branch_members = branch_headcount or manpower_used or 0
+        branch_receipt_target = None
+        if branch_tp and branch_members:
+            branch_receipt_target = round(branch_tp * branch_members, 2)
+
+        branch_receipt_gap = None
+        branch_receipt_gap_pct = None
+        branch_receipt_achieved = None
+        branch_receipt_status_label = "—"
+        if branch_receipt is not None and branch_receipt_target:
+            branch_receipt_gap = round(branch_receipt - branch_receipt_target, 2)
+            branch_receipt_gap_pct = round((branch_receipt_gap / branch_receipt_target) * 100, 2) if branch_receipt_target else 0.0
+            branch_receipt_achieved = bool(branch_receipt >= branch_receipt_target)
+            branch_receipt_status_label = "Achieved" if branch_receipt_achieved else "Not Achieved"
+
+        # Daily RQC Target = Throughput In-house (Per-day target) * In-house QC Manpower
+        # Sourced dynamically from Template Mapping or Project Insights sheet (e.g. 5000 * 6 = 30,000)
+        throughput_inhouse = snap.get("throughput_inhouse")
+        inhouse_members = (headcount_inhouse if headcount_inhouse is not None else self.inhouse_manpower_count) or 0
+        if not inhouse_members and snap.get("headcount_inhouse"):
+            inhouse_members = snap.get("headcount_inhouse")
+
+        rqc_target = None
+        if throughput_inhouse and inhouse_members:
+            rqc_target = round(throughput_inhouse * inhouse_members, 2)
+
+        rqc_gap = None
+        rqc_gap_pct = None
+        rqc_achieved = None
+        rqc_status_label = "—"
+        if rqc_completed is not None and rqc_target:
+            rqc_gap = round(rqc_completed - rqc_target, 2)
+            rqc_gap_pct = round((rqc_gap / rqc_target) * 100, 2) if rqc_target else 0.0
+            rqc_achieved = bool(rqc_completed >= rqc_target)
+            rqc_status_label = "Achieved" if rqc_achieved else "Not Achieved"
+
+        # Available Monthly Cycles (e.g. Current September 2026 vs Closed August 2026)
+        available_cycles = []
+        delivery_totals = list(self.weekly_delivery_rows.filter(is_total=True).order_by("-month_start"))
+        snap_cycles = list(reversed(snap.get("monthly_cycles") or []))
+        snap_cycles_by_key = {c.get("month_key"): c for c in snap_cycles if c.get("month_key")}
+
+        # Pre-aggregate monthly sums for daily metrics (Branch Receipt & RQC Completed)
+        monthly_daily_metrics = {}
+        for row in self.daily_operational_metrics.values("date", "metric_key", "value"):
+            d = row.get("date")
+            if not d:
+                continue
+            m_k = d.strftime("%Y-%m")
+            if m_k not in monthly_daily_metrics:
+                monthly_daily_metrics[m_k] = {"branch_receipt": 0.0, "rqc_completed": 0.0}
+            val = float(row.get("value") or 0.0)
+            if row.get("metric_key") == "branch_receipt":
+                monthly_daily_metrics[m_k]["branch_receipt"] += val
+            elif row.get("metric_key") == "rqc_completed":
+                monthly_daily_metrics[m_k]["rqc_completed"] += val
+
+        def _format_cycle_date_range(month_key, default_label=""):
+            import calendar
+            try:
+                parts = str(month_key).split("-")
+                if len(parts) == 2 and parts[0].isdigit() and parts[1].isdigit():
+                    y, m = int(parts[0]), int(parts[1])
+                    last_day = calendar.monthrange(y, m)[1]
+                    m_first = datetime.date(y, m, 1)
+                    m_last = datetime.date(y, m, last_day)
+                    last_suf = "st" if last_day in (1, 21, 31) else ("nd" if last_day in (2, 22) else ("rd" if last_day in (3, 23) else "th"))
+                    return f"1st {m_first.strftime('%b')} to {last_day}{last_suf} {m_last.strftime('%b')}"
+            except Exception:
+                pass
+
+            try:
+                candidate = f"{default_label} {month_key}".lower()
+                yr_match = re.search(r"\b(20\d\d)\b", candidate)
+                yr = int(yr_match.group(1)) if yr_match else datetime.date.today().year
+                m_lookup = {
+                    "jan": 1, "feb": 2, "mar": 3, "apr": 4, "may": 5, "jun": 6,
+                    "jul": 7, "aug": 8, "sep": 9, "oct": 10, "nov": 11, "dec": 12
+                }
+                for prefix, m_num in m_lookup.items():
+                    if prefix in candidate:
+                        last_day = calendar.monthrange(yr, m_num)[1]
+                        m_first = datetime.date(yr, m_num, 1)
+                        m_last = datetime.date(yr, m_num, last_day)
+                        last_suf = "st" if last_day in (1, 21, 31) else ("nd" if last_day in (2, 22) else ("rd" if last_day in (3, 23) else "th"))
+                        return f"1st {m_first.strftime('%b')} to {last_day}{last_suf} {m_last.strftime('%b')}"
+            except Exception:
+                pass
+
+            return default_label or month_key
+
+        today_dt = timezone.localdate()
+        current_first = today_dt.replace(day=1)
+        current_key = today_dt.strftime("%Y-%m")
+        today_label = today_dt.strftime("%B %Y")
+        seen_keys = set()
+
+        for idx, dt in enumerate(delivery_totals):
+            m_start = dt.month_start
+            m_key = m_start.strftime("%Y-%m") if m_start else re.sub(r"[^a-zA-Z0-9_-]", "-", str(dt.month_label or f"cycle-{idx}")).strip("-")
+            if not m_key:
+                m_key = f"cycle-{idx}"
+            seen_keys.add(m_key)
+
+            is_curr = bool(m_start == current_first or m_key == current_key)
+            sc = snap_cycles_by_key.get(m_key) or {}
+
+            cp = self.operational_plan_panel(cycle_month_start=m_start or dt.month_label)
+
+            # Sourced STRICTLY from this specific month's record in Project Insights (sc)
+            # Never borrow previous month's throughput or plan data!
+            c_exp_tp = sc.get("expected_throughput")
+            c_curr_tp = sc.get("current_throughput")
+            if c_curr_tp is None:
+                c_curr_tp = 0.0
+
+            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
+                c_tp_status = bool(c_curr_tp >= c_exp_tp)
+                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
+                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
+            else:
+                c_tp_status = None
+                c_tp_label = "—"
+                c_tp_gap = None
+
+            mdm = monthly_daily_metrics.get(m_key) or {}
+            c_receipts_total = mdm.get("branch_receipt", 0.0)
+            c_rqc_total = mdm.get("rqc_completed", 0.0)
+            c_date_range = _format_cycle_date_range(m_key, dt.month_label or m_key)
+
+            available_cycles.append({
+                "month_key": m_key,
+                "month_label": dt.month_label or m_key,
+                "short_label": (dt.month_label.split()[0] if dt.month_label else m_key),
+                "is_current": is_curr,
+                "monthly_plan": cp["monthly_plan"],
+                "monthly_actual": cp["monthly_actual"],
+                "monthly_gap": cp["monthly_gap"],
+                "monthly_gap_pct": cp["monthly_gap_pct"],
+                "monthly_achieved": cp["monthly_achieved"],
+                "monthly_status_label": cp["monthly_status_label"],
+                "weekly_label": cp["weekly_label"],
+                "weekly_plan": cp["weekly_plan"],
+                "weekly_actual": cp["weekly_actual"],
+                "weekly_gap": cp["weekly_gap"],
+                "weekly_achieved": cp["weekly_achieved"],
+                "expected_throughput": c_exp_tp,
+                "current_throughput": c_curr_tp,
+                "throughput_gap": c_tp_gap,
+                "target_achieved_status": c_tp_status,
+                "target_achieved_label": c_tp_label,
+                "month_receipts_total": c_receipts_total,
+                "month_rqc_total": c_rqc_total,
+                "date_range_label": c_date_range,
+            })
+
+        # Append any snap_cycles that were not in delivery_totals (or if no delivery_totals at all)
+        for idx, sc in enumerate(snap_cycles):
+            m_key = sc.get("month_key") or re.sub(r"[^a-zA-Z0-9_-]", "-", str(sc.get("month_label") or f"snap-{idx}")).strip("-")
+            if not m_key:
+                m_key = f"snap-{idx}"
+            if m_key in seen_keys:
+                continue
+            seen_keys.add(m_key)
+
+            is_curr = bool(m_key == current_key)
+            sc_cp = self.operational_plan_panel(cycle_month_start=sc.get("month_label"))
+
+            c_exp_tp = sc.get("expected_throughput")
+            c_curr_tp = sc.get("current_throughput")
+            if c_curr_tp is None:
+                c_curr_tp = 0.0
+
+            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
+                c_tp_status = bool(c_curr_tp >= c_exp_tp)
+                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
+                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
+            else:
+                c_tp_status = None
+                c_tp_label = "—"
+                c_tp_gap = None
+
+            mdm = monthly_daily_metrics.get(m_key) or {}
+            c_receipts_total = mdm.get("branch_receipt", 0.0)
+            c_rqc_total = mdm.get("rqc_completed", 0.0)
+            c_date_range = _format_cycle_date_range(m_key, sc.get("month_label") or m_key)
+
+            available_cycles.append({
+                "month_key": m_key,
+                "month_label": sc.get("month_label") or m_key,
+                "short_label": (sc.get("month_label") or m_key).split()[0],
+                "is_current": is_curr,
+                "monthly_plan": sc_cp["monthly_plan"],
+                "monthly_actual": sc_cp["monthly_actual"] if sc_cp["monthly_actual"] else (sc.get("target_achieved") or 0.0),
+                "monthly_gap": sc_cp["monthly_gap"],
+                "monthly_gap_pct": sc_cp["monthly_gap_pct"],
+                "monthly_achieved": sc_cp["monthly_achieved"],
+                "monthly_status_label": sc_cp["monthly_status_label"],
+                "weekly_label": sc_cp["weekly_label"],
+                "weekly_plan": sc_cp["weekly_plan"],
+                "weekly_actual": sc_cp["weekly_actual"],
+                "weekly_gap": sc_cp["weekly_gap"],
+                "weekly_achieved": sc_cp["weekly_achieved"],
+                "expected_throughput": c_exp_tp,
+                "current_throughput": c_curr_tp,
+                "throughput_gap": c_tp_gap,
+                "target_achieved_status": c_tp_status,
+                "target_achieved_label": c_tp_label,
+                "month_receipts_total": c_receipts_total,
+                "month_rqc_total": c_rqc_total,
+                "date_range_label": c_date_range,
+            })
+
+        if current_key not in seen_keys:
+            cp_curr = self.operational_plan_panel(cycle_month_start=current_first)
+            sc_curr = snap_cycles_by_key.get(current_key) or {}
+            c_exp_tp = sc_curr.get("expected_throughput")
+            c_curr_tp = sc_curr.get("current_throughput") or 0.0
+            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
+                c_tp_status = bool(c_curr_tp >= c_exp_tp)
+                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
+                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
+            else:
+                c_tp_status = None
+                c_tp_label = "—"
+                c_tp_gap = None
+
+            mdm_curr = monthly_daily_metrics.get(current_key) or {}
+            c_receipts_total = mdm_curr.get("branch_receipt", 0.0)
+            c_rqc_total = mdm_curr.get("rqc_completed", 0.0)
+            c_date_range = _format_cycle_date_range(current_key, today_label)
+
+            available_cycles.insert(0, {
+                "month_key": current_key,
+                "month_label": today_label,
+                "short_label": today_dt.strftime("%b"),
+                "is_current": True,
+                "monthly_plan": cp_curr.get("monthly_plan", 0),
+                "monthly_actual": cp_curr.get("monthly_actual", 0),
+                "monthly_gap": cp_curr.get("monthly_gap"),
+                "monthly_gap_pct": cp_curr.get("monthly_gap_pct", 0.0),
+                "monthly_achieved": cp_curr.get("monthly_achieved"),
+                "monthly_status_label": cp_curr.get("monthly_status_label", "—"),
+                "weekly_label": cp_curr.get("weekly_label", ""),
+                "weekly_plan": cp_curr.get("weekly_plan", 0),
+                "weekly_actual": cp_curr.get("weekly_actual", 0),
+                "weekly_gap": cp_curr.get("weekly_gap"),
+                "weekly_achieved": cp_curr.get("weekly_achieved"),
+                "expected_throughput": c_exp_tp,
+                "current_throughput": c_curr_tp,
+                "throughput_gap": c_tp_gap,
+                "target_achieved_status": c_tp_status,
+                "target_achieved_label": c_tp_label,
+                "month_receipts_total": c_receipts_total,
+                "month_rqc_total": c_rqc_total,
+                "date_range_label": c_date_range,
+            })
+            seen_keys.add(current_key)
+
+        # Strictly ensure that ONLY the system date current month has is_current = True
+        for c in available_cycles:
+            c["is_current"] = bool(c.get("month_key") == current_key)
+
+        active_cycle = next((c for c in available_cycles if c.get("is_current")), None) or (available_cycles[0] if available_cycles else None)
+
+        m_plan = plan["monthly_plan"]
+        m_actual = plan["monthly_actual"]
+        m_label = plan["monthly_label"]
+        m_gap = plan["monthly_gap"]
+        m_gap_pct = plan["monthly_gap_pct"]
+        m_achieved = plan["monthly_achieved"]
+        m_status_label = plan["monthly_status_label"]
+
+        if active_cycle:
+            m_plan = active_cycle.get("monthly_plan", 0)
+            m_actual = active_cycle.get("monthly_actual", 0)
+            m_label = active_cycle.get("month_label", today_label)
+            m_gap = active_cycle.get("monthly_gap")
+            m_gap_pct = active_cycle.get("monthly_gap_pct", 0.0)
+            m_achieved = active_cycle.get("monthly_achieved")
+            m_status_label = active_cycle.get("monthly_status_label", "—")
+
+            expected_throughput = active_cycle.get("expected_throughput")
+            current_throughput = active_cycle.get("current_throughput", 0.0)
+            throughput_gap = active_cycle.get("throughput_gap")
+            target_achieved_status = active_cycle.get("target_achieved_status")
+            target_achieved_label = active_cycle.get("target_achieved_label", "—")
+
+        return {
+            "project": self,
+            "current_month_key": current_key,
+            "available_cycles": available_cycles,
+            "available_cycles_json": json.dumps(available_cycles),
+            "monthly_plan": m_plan,
+            "monthly_actual": m_actual,
+            "monthly_target_achieved": m_actual,
+            "monthly_gap": m_gap,
+            "monthly_gap_pct": m_gap_pct,
+            "monthly_achieved": m_achieved,
+            "monthly_status_label": m_status_label,
+            "monthly_label": m_label,
+
+            "weekly_plan": plan["weekly_plan"],
+            "weekly_actual": plan["weekly_actual"],
+            "weekly_target_achieved": plan["weekly_target_achieved"],
+            "weekly_gap": plan["weekly_gap"],
+            "weekly_gap_pct": plan["weekly_gap_pct"],
+            "weekly_achieved": plan["weekly_achieved"],
+            "weekly_status_label": plan["weekly_status_label"],
+            "weekly_label": plan["weekly_label"],
+            "gm_name": self.gm_name,
+            "pm_name": snap.get("pm_name") or self.pm_name,
+            "pl_name": self.pl_name,
+            "branch_receipt": branch_receipt,
+            "branch_receipt_target": branch_receipt_target,
+            "branch_receipt_gap": branch_receipt_gap,
+            "branch_receipt_gap_pct": branch_receipt_gap_pct,
+            "branch_receipt_achieved": branch_receipt_achieved,
+            "branch_receipt_status_label": branch_receipt_status_label,
+            "rqc_completed": rqc_completed,
+            "rqc_target": rqc_target,
+            "rqc_gap": rqc_gap,
+            "rqc_gap_pct": rqc_gap_pct,
+            "rqc_achieved": rqc_achieved,
+            "rqc_status_label": rqc_status_label,
+            "throughput_branch": snap.get("throughput_branch") or quoted_throughput,
+            "throughput_inhouse": throughput_inhouse,
+            "expected_throughput": expected_throughput,
+            "current_throughput": current_throughput,
+            "quoted_throughput": quoted_throughput,
+            "manpower_used": manpower_used,
+            "working_days": working_days,
+            "target_achieved": target_achieved,
+            "target_achieved_status": target_achieved_status,
+            "target_achieved_label": target_achieved_label,
+            "throughput_gap": throughput_gap,
+            "throughput_gap_pct": throughput_gap_pct,
+            "headcount_branch": headcount_branch,
+            "headcount_inhouse": headcount_inhouse,
+            "variance_vs_plan": variance_vs_plan,
+            "planned_run_rate": planned_run_rate,
+            "current_run_rate": current_run_rate,
+            "run_rate_gap": run_rate_gap,
+            "run_rate_gap_pct": run_rate_gap_pct,
+            "run_rate_achieved": run_rate_achieved,
+            "run_rate_status_label": run_rate_status_label,
+            "rqc_quality_score": rqc_quality_score,
+            "required_headcount": required_headcount,
+            "as_of_month": snap.get("month_label") or "",
+        }
+
+    def operational_alerts(self):
+        """Section-3 alert flags. Shipment Risk / Throughput Variance
+        compare the source sheets' own Current vs Planned/Quoted numbers
+        directly. Vendor Receipt / RQC Plan-vs-Actual don't have a separate
+        day-by-day plan number of their own in the source file, so they're
+        compared against an EXPECTED-BY-NOW figure using the same
+        working-days pace as `timeline_percent` (Target Records x % of the
+        project timeline elapsed) - only shown once a Branch Receipt/RQC
+        column is actually configured. Bands: <=10% gap = fine (no alert),
+        10-25% = yellow, >25% = red - same tight-bands convention as
+        `status`/`milestones()` elsewhere on Project."""
+        panel = self.operational_panel()
+        alerts = []
+
+        def _band(gap_pct):
+            gap_pct = abs(gap_pct)
+            if gap_pct <= 10:
+                return None
+            return "red" if gap_pct > 25 else "yellow"
+
+        prr, crr = panel["planned_run_rate"], panel["current_run_rate"]
+        if prr and crr is not None and crr < prr:
+            gap_pct = (crr - prr) / prr * 100
+            level = _band(gap_pct)
+            if level:
+                alerts.append({
+                    "type": "Shipment Risk", "level": level, "project": self,
+                    "message": f"Current run rate ({crr:,.0f}) is {abs(gap_pct):.1f}% below the required run rate ({prr:,.0f}).",
+                })
+
+        et, ct = panel["expected_throughput"], panel["current_throughput"]
+        if et and ct is not None and ct < et:
+            gap_pct = (ct - et) / et * 100
+            level = _band(gap_pct)
+            if level:
+                alerts.append({
+                    "type": "Throughput Variance", "level": level, "project": self,
+                    "message": f"Current throughput ({ct:,.0f}) is {abs(gap_pct):.1f}% below the planned throughput ({et:,.0f}).",
+                })
+
+        expected_to_date = self.target_records * (self.timeline_percent / 100) if self.target_records else 0
+        br = panel.get("branch_receipt")
+        br_target = panel.get("branch_receipt_target")
+        if br is not None and br_target:
+            if br < br_target:
+                gap_pct = (br - br_target) / br_target * 100
+                level = _band(gap_pct)
+                if level:
+                    alerts.append({
+                        "type": "Branch Receipt Shortfall", "level": level, "project": self,
+                        "message": f"Daily branch receipt ({br:,.0f}) is {abs(gap_pct):.1f}% below the daily target ({br_target:,.0f}).",
+                    })
+        elif self.branch_receipt_column_key and expected_to_date and br is not None:
+            gap_pct = (br - expected_to_date) / expected_to_date * 100
+            level = _band(gap_pct)
+            if level:
+                direction = "shortfall" if br < expected_to_date else "excess"
+                alerts.append({
+                    "type": "Vendor Receipt Plan vs Actual", "level": level, "project": self,
+                    "message": f"Branch receipt ({br:,.0f}) is a {abs(gap_pct):.1f}% {direction} against the expected pace ({expected_to_date:,.0f}).",
+                })
+
+        rc = panel.get("rqc_completed")
+        rc_target = panel.get("rqc_target")
+        if rc is not None and rc_target:
+            if rc < rc_target:
+                gap_pct = (rc - rc_target) / rc_target * 100
+                level = _band(gap_pct)
+                if level:
+                    alerts.append({
+                        "type": "RQC Shortfall", "level": level, "project": self,
+                        "message": f"Daily RQC completed ({rc:,.0f}) is {abs(gap_pct):.1f}% below the daily target ({rc_target:,.0f}).",
+                    })
+        elif self.rqc_completed_column_key and expected_to_date and rc is not None:
+            if rc < expected_to_date:
+                gap_pct = (rc - expected_to_date) / expected_to_date * 100
+                level = _band(gap_pct)
+                if level:
+                    alerts.append({
+                        "type": "RQC Plan vs Actual", "level": level, "project": self,
+                        "message": f"RQC completed ({rc:,.0f}) is {abs(gap_pct):.1f}% below the expected pace ({expected_to_date:,.0f}).",
+                    })
+
+        return alerts
 
     def project_status_panel(self):
         """Project Status panel (Project Insights): sourced from the Project
@@ -312,6 +1111,88 @@ class Project(models.Model):
             "batches_keyed": keyed,
             "batches_being_keyed": max(total_batches - keyed, 0),
         }
+
+    def weekly_delivery_plan(self):
+        """Groups this project's WeeklyDeliveryPlanRow rows (already one row
+        per week + one "Total" row per month, from the sheet's own
+        structure - see WeeklyDeliveryPlanRow/extract_weekly_delivery_rows)
+        into one entry per month for display: that month's Plan/Actual/
+        Variance (straight from its own "Total" row, or summed from the
+        week rows if a template genuinely has no Total row) plus the list
+        of individual week rows underneath."""
+        from itertools import groupby
+
+        rows = list(self.weekly_delivery_rows.all().order_by("month_start", "sno"))
+        months = []
+        for month_label, group in groupby(rows, key=lambda r: r.month_label):
+            group = list(group)
+            total_row = next((r for r in group if r.is_total), None)
+            weeks = [r for r in group if not r.is_total]
+            for w in weeks:
+                if w.shipment_date:
+                    if w.shipment_date.weekday() == 0:  # Monday -> Saturday
+                        w.shipment_date = w.shipment_date - datetime.timedelta(days=2)
+                    elif w.shipment_date.weekday() == 6:  # Sunday -> Saturday
+                        w.shipment_date = w.shipment_date - datetime.timedelta(days=1)
+            months.append({
+                "month_label": month_label,
+                "monthly_plan": total_row.plan_records if total_row else sum(w.plan_records for w in weeks),
+                "monthly_actual": total_row.actual_records if total_row else sum(w.actual_records for w in weeks),
+                "monthly_variance": total_row.variance if total_row else sum(w.variance for w in weeks),
+                "monthly_variance_pct": total_row.variance_pct if total_row else 0,
+                "weeks": weeks,
+            })
+        return months
+
+    def operational_day_detail(self, target_date):
+        """Day / current-week (Mon-Sun containing target_date) / current-
+        month rollup for Branch Receipt and RQC Completed - powers the
+        Operational Dashboard's Calendar view (click any date, see that
+        day's + its week's + its month's totals). RQC Quality Score has no
+        daily history (see DailyOperationalMetric docstring) so it's
+        reported here as the same running-average figure regardless of
+        which date was clicked."""
+        week_start = target_date - datetime.timedelta(days=target_date.weekday())
+        week_end = week_start + datetime.timedelta(days=6)
+        month_start = target_date.replace(day=1)
+        next_month = (
+            target_date.replace(year=target_date.year + 1, month=1, day=1)
+            if target_date.month == 12
+            else target_date.replace(month=target_date.month + 1, day=1)
+        )
+        month_end = next_month - datetime.timedelta(days=1)
+
+        out = {
+            "date": target_date, "week_start": week_start, "week_end": week_end,
+            "month_start": month_start, "month_end": month_end,
+        }
+        for key in (DailyOperationalMetric.METRIC_BRANCH_RECEIPT, DailyOperationalMetric.METRIC_RQC_COMPLETED):
+            qs = self.daily_operational_metrics.filter(metric_key=key)
+            out[key] = {
+                "day": qs.filter(date=target_date).aggregate(v=Sum("value"))["v"] or 0,
+                "week": qs.filter(date__gte=week_start, date__lte=week_end).aggregate(v=Sum("value"))["v"] or 0,
+                "month": qs.filter(date__gte=month_start, date__lte=month_end).aggregate(v=Sum("value"))["v"] or 0,
+            }
+        snap = self.operational_snapshot or {}
+        rqc_q = snap.get("rqc_quality_score")
+        if rqc_q is not None:
+            try:
+                rqc_val = float(rqc_q)
+                if 0 < rqc_val <= 1.0:
+                    rqc_q = round(rqc_val * 100.0, 2)
+                else:
+                    rqc_q = round(rqc_val, 2)
+            except (ValueError, TypeError):
+                pass
+        out["rqc_quality_score"] = rqc_q
+        return out
+
+    def daily_metric_dates(self, year, month):
+        """Which day-of-month numbers this project has ANY daily-metric
+        data for, in the given month - used to mark which Calendar cells
+        actually have something behind them."""
+        dates = self.daily_operational_metrics.filter(date__year=year, date__month=month).values_list("date", flat=True)
+        return sorted({d.day for d in dates})
 
     @property
     def working_days_total(self):
@@ -596,3 +1477,82 @@ class ImportBatch(models.Model):
 
     def __str__(self):
         return f"{self.file_name} - {self.status}"
+
+
+class WeeklyDeliveryPlanRow(models.Model):
+    """One row per week (plus one 'Total' row per month) from a project's
+    "Weekly Delivery Plan" sheet - that sheet is a repeating block per
+    month ("August 2026 - Weekly Delivery Plan", its own header row, a
+    Week-1..Week-N row each, then a Total row), not one flat table, so this
+    mirrors that shape directly rather than forcing it into Project's
+    single-row-per-project fields. Fully replaced on every (re)import, same
+    "source file is the single source of truth" rule as InventoryItem."""
+
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="weekly_delivery_rows")
+
+    month_label = models.CharField(max_length=50, blank=True, default="")  # e.g. "August 2026", as written on the sheet
+    month_start = models.DateField(null=True, blank=True)  # parsed from month_label, for chronological sorting
+
+    week_label = models.CharField(max_length=50, blank=True, default="")  # "Week-1".."Week-N", or "Total"
+    sno = models.IntegerField(null=True, blank=True)
+    shipment_date = models.DateField(null=True, blank=True)
+
+    plan_records = models.BigIntegerField(default=0)
+    actual_records = models.BigIntegerField(default=0)
+    variance = models.BigIntegerField(default=0)
+    variance_pct = models.FloatField(default=0)
+
+    reason = models.CharField(max_length=500, blank=True, default="")
+    remarks = models.CharField(max_length=500, blank=True, default="")
+
+    is_total = models.BooleanField(default=False)  # True for the month's own "Total" row, False for a real week
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["month_start", "sno"]
+
+    def save(self, *args, **kwargs):
+        if self.shipment_date and not self.is_total:
+            if self.shipment_date.weekday() == 0:  # Monday -> Saturday
+                self.shipment_date = self.shipment_date - datetime.timedelta(days=2)
+            elif self.shipment_date.weekday() == 6:  # Sunday -> Saturday
+                self.shipment_date = self.shipment_date - datetime.timedelta(days=1)
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.project.project_name} - {self.month_label} {self.week_label}"
+
+
+class DailyOperationalMetric(models.Model):
+    """One row per (project, metric, date) - the full daily history behind
+    two of the Operational Dashboard's figures (Daily Branch Receipt, Daily
+    RQC Completed). Project.operational_snapshot only keeps each metric's
+    single MOST RECENT day's number (see apps/mapping/engine.py:
+    extract_daily_metric) - this is the full history behind it, so the
+    Calendar view can show ANY date's day/week/month figures, not just the
+    latest one. Populated from the same config["daily_metrics"] rule, via
+    extract_daily_metric_series - fully replaced on every (re)import.
+
+    RQC Quality Score has no calendar history: per its own mapping rule
+    (no date_column - a running average, not something that resets per
+    day), there's no "which day" to file any of it under."""
+
+    METRIC_BRANCH_RECEIPT = "branch_receipt"
+    METRIC_RQC_COMPLETED = "rqc_completed"
+    METRIC_CHOICES = [
+        (METRIC_BRANCH_RECEIPT, "Daily Branch Receipt"),
+        (METRIC_RQC_COMPLETED, "Daily RQC Completed"),
+    ]
+
+    project = models.ForeignKey("projects.Project", on_delete=models.CASCADE, related_name="daily_operational_metrics")
+    metric_key = models.CharField(max_length=30, choices=METRIC_CHOICES)
+    date = models.DateField()
+    value = models.FloatField(default=0)
+
+    class Meta:
+        ordering = ["date"]
+        unique_together = [("project", "metric_key", "date")]
+
+    def __str__(self):
+        return f"{self.project.project_name} {self.metric_key} {self.date}: {self.value}"

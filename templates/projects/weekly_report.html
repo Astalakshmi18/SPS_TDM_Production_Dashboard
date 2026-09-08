@@ -1,0 +1,127 @@
+{% extends "base/base.html" %}
+{% load humanize %}
+{% block title %}{{ project.project_name }} - Weekly Delivery Report - Swift Prosys{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div>
+    <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">{{ project.project_name }} — Weekly Delivery Report</h4>
+    <div class="small text-muted">Monthly Plan vs Shipped, and Weekly Plan vs Shipped.</div>
+  </div>
+  <a href="{% url 'projects:detail' project.pk %}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Project Detail</a>
+</div>
+
+<div class="d-flex flex-wrap gap-2 mb-3 align-items-center">
+  <select class="form-select form-select-sm w-auto" onchange="window.location=this.selectedOptions[0].dataset.url">
+    {% for p in all_projects %}
+    <option value="{{ p.pk }}" data-url="{% url 'projects:weekly_report' p.pk %}" {% if p.pk == project.pk %}selected{% endif %}>{{ p.project_name }}</option>
+    {% endfor %}
+  </select>
+</div>
+
+{% if not months %}
+<div class="sp-panel">
+  <p class="text-muted mb-0">No Weekly Delivery Plan data yet for this project - make sure its template has a
+    <code>weekly_delivery_rows</code> mapping rule, then Sync Now.</p>
+</div>
+{% else %}
+
+<!-- MONTHLY PLAN VS SHIPPED -->
+<div class="sp-panel mb-3">
+  <h6 class="mb-3">Monthly Plan vs Shipped</h6>
+  <div style="height: 280px;">
+    <canvas id="monthlyChart"></canvas>
+  </div>
+  <div class="table-responsive mt-3">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th class="text-end">Monthly Plan</th>
+          <th class="text-end">Shipped (Actual)</th>
+          <th class="text-end">Variance</th>
+          <th class="text-end">Variance %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in months %}
+        <tr>
+          <td>{{ m.month_label }}</td>
+          <td class="text-end sp-num">{{ m.monthly_plan|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num">{{ m.monthly_actual|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num {% if m.monthly_variance < 0 %}text-danger{% else %}text-success{% endif %}">{{ m.monthly_variance|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num">{{ m.monthly_variance_pct|floatformat:1 }}%</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- WEEKLY PLAN VS SHIPPED -->
+<div class="sp-panel">
+  <h6 class="mb-3">Weekly Plan vs Shipped</h6>
+  <div style="height: 280px;">
+    <canvas id="weeklyChart"></canvas>
+  </div>
+  <div class="table-responsive mt-3">
+    <table class="table table-sm table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Month</th>
+          <th>Week</th>
+          <th>Date of Shipment</th>
+          <th class="text-end">Weekly Plan</th>
+          <th class="text-end">Shipped (Actual)</th>
+          <th class="text-end">Variance</th>
+          <th class="text-end">Variance %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in weekly_rows %}
+        <tr>
+          <td>{{ r.month_label }}</td>
+          <td>{{ r.week.week_label }}</td>
+          <td>{{ r.week.shipment_date|date:"d-M-Y (D)"|default:"—" }}</td>
+          <td class="text-end sp-num">{{ r.week.plan_records|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num">{{ r.week.actual_records|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num {% if r.week.variance < 0 %}text-danger{% else %}text-success{% endif %}">{{ r.week.variance|floatformat:0|intcomma }}</td>
+          <td class="text-end sp-num">{{ r.week.variance_pct|floatformat:1 }}%</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-muted">No weekly rows</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const monthlyData = {{ monthly_chart_json|safe }};
+const weeklyData = {{ weekly_chart_json|safe }};
+
+new Chart(document.getElementById('monthlyChart'), {
+  type: 'bar',
+  data: { labels: monthlyData.labels, datasets: [
+    { label: 'Monthly Plan', data: monthlyData.plan, backgroundColor: '#0b1f3a' },
+    { label: 'Shipped (Actual)', data: monthlyData.actual, backgroundColor: '#14b8a6' },
+  ]},
+  options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } } }
+});
+
+new Chart(document.getElementById('weeklyChart'), {
+  type: 'bar',
+  data: { labels: weeklyData.labels, datasets: [
+    { label: 'Weekly Plan', data: weeklyData.plan, backgroundColor: '#0b1f3a' },
+    { label: 'Shipped (Actual)', data: weeklyData.actual, backgroundColor: '#14b8a6' },
+  ]},
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+    scales: { x: { ticks: { autoSkip: true, maxRotation: 60, minRotation: 45 } } }
+  }
+});
+</script>
+
+{% endif %}
+{% endblock %}

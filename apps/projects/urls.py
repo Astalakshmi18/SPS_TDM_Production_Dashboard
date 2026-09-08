@@ -13,6 +13,7 @@ urlpatterns = [
     path("<int:pk>/edit/", views.project_edit, name="edit"),
     path("<int:pk>/delete/", views.project_delete, name="delete"),
     path("<int:pk>/insights/", views.project_insights, name="insights"),
+    path("<int:pk>/weekly-report/", views.weekly_delivery_report, name="weekly_report"),
     path("<int:pk>/sync-now/", views.project_sync_now, name="sync_now"),
     path("webhook/<int:pk>/<str:token>/", views.gsheet_webhook, name="gsheet_webhook"),
     path("cron/sync-all/<str:token>/", views.cron_sync_all, name="cron_sync_all"),

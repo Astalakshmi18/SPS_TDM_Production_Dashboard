@@ -1,10 +1,12 @@
+import calendar
+import datetime
 import json
 from collections import Counter
 
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 
 from apps.accounts.decorators import accessible_branches, accessible_projects
@@ -42,6 +44,7 @@ def home(request):
     branch_filter = request.GET.get("branch")
     vendor_filter = request.GET.get("vendor")
     project_filter = request.GET.get("project")
+    gm_filter = request.GET.get("gm")
 
     # `projects` gets progressively narrowed by the filters below for the
     # KPIs/table - `all_projects` (above) stays unfiltered so the "All
@@ -57,6 +60,8 @@ def home(request):
         projects = projects.filter(vendor=vendor_filter)
     if project_filter:
         projects = projects.filter(pk=project_filter)
+    if gm_filter:
+        projects = projects.filter(gm_name=gm_filter)
 
     totals = projects.aggregate(target=Sum("target_records"), delivered=Sum("delivered_records"),
                                  images=Sum("total_images"))
@@ -67,19 +72,28 @@ def home(request):
     delivery_pct = round((delivered / target) * 100, 2) if target else 0.0
 
     # Total Batches / Batches Being Processed / Promoted: summed per-project via
-    # batches_keying_panel() (No. of Batches - No. of Batches Shipped = No.
-    # of Batches Being Processed), NOT a plain DB Sum() of the stored fields -
-    # those stored fields only reflect the raw import-time derivation, so a
-    # project with the WIP/blank-excluding refinement configured on Project
-    # Insights would show one number there and a different, stale one here.
+    # Single pass over `projects`, computing everything every section below
+    # needs ONCE per project - batches_keying_panel() and
+    # milestone_shipment_checkpoints() were each being called TWICE per
+    # project before (once here for the KPI/milestone-summary totals, again
+    # further down for the detail tables), doubling their underlying
+    # InventoryItem queries for no reason; this computes each once and
+    # reuses it everywhere below. Output is unchanged - same values land in
+    # the same places, just without the repeat work.
+    per_project = []
     total_batches = 0
     batches_being_keyed = 0
     promoted = 0
     for p in projects:
         panel = p.batches_keying_panel()
+        checkpoints = {c["label"]: c for c in p.milestone_shipment_checkpoints()}
+        idx_start = {m["label"]: m for m in p.milestones()}.get("IDX Start")
+
         total_batches += panel["total_batches"]
         batches_being_keyed += panel["batches_being_keyed"]
         promoted += p.promoted
+
+        per_project.append({"project": p, "batches": panel, "checkpoints": checkpoints, "idx_start": idx_start})
     promoted_pct = round((promoted / total_batches) * 100, 2) if total_batches else 0.0
 
     kpis = {
@@ -121,47 +135,49 @@ def home(request):
 
     # PHX-style Milestone Summary: bucket every project by its 100% checkpoint
     # status, plus a full per-project milestone table (IDX Start/10%/50%/100%).
-    milestone_100_counts = Counter(p.milestone_100_status for p in projects)
+    # milestone_100_status (a Project property) internally calls
+    # milestone_shipment_checkpoints() itself too - reading the 100% entry
+    # straight out of the already-computed `checkpoints` above avoids
+    # triggering that a THIRD time per project.
+    milestone_100_counts = Counter(pp["checkpoints"].get("100%", {}).get("status") for pp in per_project)
     milestone_summary = [
         {"key": key, "label": label, "count": milestone_100_counts.get(key, 0), "color": MILESTONE_STATUS_COLORS[key]}
         for key, label in MILESTONE_STATUS_LABELS.items()
         if milestone_100_counts.get(key, 0) > 0
     ]
-    milestone_table_rows = []
-    for p in projects:
-        idx_start = {m["label"]: m for m in p.milestones()}.get("IDX Start")
-        # m10/m50/m100 now come from milestone_shipment_checkpoints() - the
-        # REAL, actually-shipped-by-that-date % (Inventory page Shipment
-        # Date column) and its own Green/Yellow/Red, rather than the
-        # straight-line pace estimate milestones() uses on its own. IDX
-        # Start (= Project Start, always day zero) still comes from
-        # milestones() since there's no "shipped by project start" figure
-        # to compute.
-        shipment_checkpoints = {c["label"]: c for c in p.milestone_shipment_checkpoints()}
-        milestone_table_rows.append({
-            "project": p,
-            "idx_start": idx_start,
-            "m10": shipment_checkpoints.get("10%"),
-            "m50": shipment_checkpoints.get("50%"),
-            "m100": shipment_checkpoints.get("100%"),
-            "batches": p.batches_keying_panel(),
-        })
+    # m10/m50/m100 come from milestone_shipment_checkpoints() - the REAL,
+    # actually-shipped-by-that-date % (Inventory page Shipment Date column)
+    # and its own Green/Yellow/Red, rather than the straight-line pace
+    # estimate milestones() uses on its own. IDX Start (= Project Start,
+    # always day zero) still comes from milestones() since there's no
+    # "shipped by project start" figure to compute.
+    milestone_table_rows = [
+        {
+            "project": pp["project"],
+            "idx_start": pp["idx_start"],
+            "m10": pp["checkpoints"].get("10%"),
+            "m50": pp["checkpoints"].get("50%"),
+            "m100": pp["checkpoints"].get("100%"),
+            "batches": pp["batches"],
+        }
+        for pp in per_project
+    ]
 
     # Project Detail Table (bottom of page): Total Volume/Delivered/Remaining
     # + week-based Expected % + the 10%/50%/100% checkpoint dates paired
     # with "PctBy X%" (actual shipped-by-that-date % from the Inventory
     # page's own shipment_date column - see Project.milestone_shipment_
-    # checkpoints). Precomputed here rather than called per-cell in the
-    # template so each project's Inventory rows are only queried once.
-    project_table_rows = []
-    for p in projects:
-        cps = {c["label"]: c for c in p.milestone_shipment_checkpoints()}
-        project_table_rows.append({
-            "project": p,
-            "cp10": cps.get("10%"),
-            "cp50": cps.get("50%"),
-            "cp100": cps.get("100%"),
-        })
+    # checkpoints).
+    project_table_rows = [
+        {
+            "project": pp["project"],
+            "cp10": pp["checkpoints"].get("10%"),
+            "cp50": pp["checkpoints"].get("50%"),
+            "cp100": pp["checkpoints"].get("100%"),
+            "weekly_delivery_plan": pp["project"].weekly_delivery_plan(),
+        }
+        for pp in per_project
+    ]
 
     context = {
         "kpis": kpis,
@@ -170,6 +186,7 @@ def home(request):
         "show_branch_filter": branches.count() > 1,
         "show_project_filter": all_projects.count() > 1,
         "vendors": _distinct_ci(all_projects, "vendor"),
+        "gms": _distinct_ci(all_projects, "gm_name"),
         "branch_chart_json": json.dumps(branch_chart),
         "completion_chart_json": json.dumps(completion_chart),
         "status_chart_json": json.dumps(status_chart),
@@ -180,6 +197,7 @@ def home(request):
         "selected_branch": branch_filter or "",
         "selected_vendor": vendor_filter or "",
         "selected_project": project_filter or "",
+        "selected_gm": gm_filter or "",
         "all_projects": all_projects,
         # Presentation-only: lets the Project Detail Table derive a richer
         # 5-state milestone indicator (Met / Future-On Track / Future-At Risk /
@@ -211,3 +229,124 @@ def home(request):
         })
 
     return render(request, "dashboard/home.html", context)
+
+
+@login_required
+def operational(request):
+    """Project-Level Operational Dashboard (ops-review request): one row per
+    project with Monthly/Weekly Plan, GM/PM/PL, Daily Branch Receipt/RQC
+    Completed, Expected/Current Throughput, Headcount split, Variance vs
+    Plan, Planned/Current Run Rate, RQC Quality Score, Required Headcount -
+    plus the 4 alert types, and an Executive Summary strip (CEO/MD view)
+    condensing the whole portfolio to counts + the top at-risk projects."""
+    all_projects = accessible_projects(request).select_related("branch")
+    branches = accessible_branches(request)
+
+    branch_filter = request.GET.get("branch")
+    project_filter = request.GET.get("project")
+    projects = all_projects
+    if branch_filter:
+        projects = projects.filter(branch__code=branch_filter)
+    if project_filter:
+        projects = projects.filter(pk=project_filter)
+
+    rows = []
+    all_alerts = []
+    for p in projects:
+        alerts = p.operational_alerts()
+        rows.append({"panel": p.operational_panel(), "alerts": alerts})
+        all_alerts.extend(alerts)
+
+    alert_counts = Counter(a["level"] for a in all_alerts)
+    alerts_by_project = Counter(a["project"].pk for a in all_alerts)
+    # CEO/MD executive summary: rank projects by how many red/yellow alerts
+    # they're carrying (red weighted heavier) so leadership sees the
+    # projects needing a call TODAY at the top, not just an alphabetical list.
+    risk_weight = Counter()
+    for a in all_alerts:
+        risk_weight[a["project"].pk] += 3 if a["level"] == "red" else 1
+    top_at_risk = sorted(
+        ({"project": p, "alert_count": alerts_by_project.get(p.pk, 0)} for p in projects if alerts_by_project.get(p.pk)),
+        key=lambda r: risk_weight[r["project"].pk], reverse=True,
+    )[:5]
+
+    context = {
+        "rows": rows,
+        "branches": branches,
+        "show_branch_filter": branches.count() > 1,
+        "show_project_filter": all_projects.count() > 1,
+        "all_projects": all_projects,
+        "selected_branch": branch_filter or "",
+        "selected_project": project_filter or "",
+        "exec_summary": {
+            "total_projects": projects.count(),
+            "red_count": alert_counts.get("red", 0),
+            "yellow_count": alert_counts.get("yellow", 0),
+            "clean_count": projects.count() - len(alerts_by_project),
+            "top_at_risk": top_at_risk,
+        },
+    }
+    return render(request, "dashboard/operational.html", context)
+
+
+@login_required
+def operational_calendar(request, pk):
+    """Per-project Calendar view for the Operational Dashboard (an
+    alternative to the Project-Level Operational Review table, not a
+    replacement for it - see operational.html's Table/Calendar toggle).
+    Renders a month grid; clicking a date fetches that day's + its week's +
+    its month's Branch Receipt/RQC Completed/RQC Quality Score via
+    operational_day_detail_json below, without a full page reload."""
+    project = get_object_or_404(accessible_projects(request), pk=pk)
+
+    today = timezone.localdate()
+    try:
+        year = int(request.GET.get("year", today.year))
+        month = int(request.GET.get("month", today.month))
+    except ValueError:
+        year, month = today.year, today.month
+
+    cal = calendar.Calendar(firstweekday=0)  # Monday-first, matches WeeklyDeliveryPlanRow's own week convention
+    month_days = cal.monthdayscalendar(year, month)  # list of weeks, each a list of 7 ints (0 = day outside this month)
+    data_days = set(project.daily_metric_dates(year, month))
+
+    prev_month, prev_year = (12, year - 1) if month == 1 else (month - 1, year)
+    next_month, next_year = (1, year + 1) if month == 12 else (month + 1, year)
+
+    context = {
+        "project": project,
+        "all_projects": accessible_projects(request),
+        "year": year,
+        "month": month,
+        "month_name": calendar.month_name[month],
+        "month_days": month_days,
+        "data_days": data_days,
+        "today": today,
+        "prev_year": prev_year, "prev_month": prev_month,
+        "next_year": next_year, "next_month": next_month,
+    }
+    return render(request, "dashboard/operational_calendar.html", context)
+
+
+@login_required
+def operational_day_detail_json(request, pk, date):
+    """JSON backing operational_calendar's date-click panel - day/week/
+    month rollup for Branch Receipt and RQC Completed, plus the (dateless,
+    running-average) RQC Quality Score figure."""
+    project = get_object_or_404(accessible_projects(request), pk=pk)
+    try:
+        target_date = datetime.date.fromisoformat(date)
+    except ValueError:
+        return JsonResponse({"error": "invalid date"}, status=400)
+
+    detail = project.operational_day_detail(target_date)
+    return JsonResponse({
+        "date": detail["date"].isoformat(),
+        "week_start": detail["week_start"].isoformat(),
+        "week_end": detail["week_end"].isoformat(),
+        "month_start": detail["month_start"].isoformat(),
+        "month_end": detail["month_end"].isoformat(),
+        "branch_receipt": detail["branch_receipt"],
+        "rqc_completed": detail["rqc_completed"],
+        "rqc_quality_score": detail["rqc_quality_score"],
+    })

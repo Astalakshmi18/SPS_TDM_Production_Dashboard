@@ -19,6 +19,7 @@
         <span class="sp-nav-text">Production Dashboard</span>
       </a>
     </li>
+
     <li class="nav-item">
       <a class="nav-link {% if request.resolver_match.app_name == 'inventory' %}active{% endif %}" href="{% url 'inventory:list' %}" title="Inventory Tracker">
         <i class="bi bi-boxes"></i>
