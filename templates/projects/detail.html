@@ -1043,13 +1043,16 @@
           </div>
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <span class="sp-chip">
+              <i class="bi bi-building text-primary"></i> Customer: <strong class="text-dark">{{ project.customer_name|default:project.effective_customer_name|default:"—" }}</strong>
+            </span>
+            <span class="sp-chip">
               <i class="bi bi-geo-alt-fill text-danger"></i> {{ project.branch.name }} ({{ project.branch.code }})
             </span>
             <span class="sp-chip">
               <i class="bi bi-calendar3-range text-primary"></i> {{ project.start_date|default:"Start" }} &ndash; {{ project.end_date|default:"End" }}
             </span>
             <span class="sp-chip">
-              <span class="status-dot status-{{ project.status }}"></span> {{ project.status|title }}
+              <span class="status-dot status-{{ project.status }}"></span> {{ project.status_label|default:project.status|title }}
             </span>
             {% if project.language %}
             <span class="sp-chip">
@@ -1118,14 +1121,19 @@
       </div>
     </div>
 
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <!-- <div class="sp-lead-item">
+        <i class="bi bi-person-workspace text-primary"></i>
+        <span class="text-muted">Manpower Used:</span>
+        <strong class="text-primary" id="kpiManpowerUsedVal">{{ operational.manpower_used|default:"—"|floatformat:0 }}</strong>
+      </div> -->
       <div class="sp-lead-item">
         <i class="bi bi-people-fill text-info"></i>
         <span class="text-muted">Headcount:</span>
         <span class="fw-bold text-dark">
-          Branch: <strong class="text-primary">{{ operational.headcount_branch|default:project.branch_manpower_count|default:"0"|floatformat:0 }}</strong>
+          Branch: <strong class="text-primary" id="kpiHeadcountBranchVal">{{ operational.headcount_branch|default:project.branch_manpower_count|default:"0"|floatformat:0 }}</strong>
           <span class="text-muted mx-1">|</span>
-          In-house: <strong class="text-primary">{{ operational.headcount_inhouse|default:project.inhouse_manpower_count|default:"0"|floatformat:0 }}</strong>
+          In-house: <strong class="text-primary" id="kpiHeadcountInhouseVal">{{ operational.headcount_inhouse|default:project.inhouse_manpower_count|default:"0"|floatformat:0 }}</strong>
         </span>
       </div>
     </div>
@@ -1363,21 +1371,24 @@
             {% endif %}
           </span>
         </div>
-        <div class="ops-kpi-value text-success mt-1" id="kpiCurrentThroughputVal">
-          {{ operational.current_throughput|default:"0"|floatformat:0|intcomma }}
+        <div class="ops-kpi-value {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %} mt-1" id="kpiCurrentThroughputVal">
+          {{ operational.current_throughput|default:"0"|floatformat:"-2"|intcomma }}
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
         <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Expected: <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
+          <span class="text-muted small">Expected: <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:"-2"|intcomma }}{% else %}—{% endif %}</strong></span>
           <span
             class="small fw-bold {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiThroughputGapVal">
             {% if operational.throughput_gap is not None %}
-            {% if operational.throughput_gap >= 0 %}+{% endif %}{{ operational.throughput_gap|floatformat:0|intcomma }}
+            {% if operational.throughput_gap >= 0 %}+{% endif %}{{ operational.throughput_gap|floatformat:"-2"|intcomma }}
             {% endif %}
           </span>
         </div>
+        <!-- <div class="text-muted small" style="font-size: 0.68rem;" title="Current Throughput Formula">
+          <i class="bi bi-calculator me-1"></i><span>Inv Data / (<span id="tpFormulaMp">{{ operational.manpower_used|default:1|floatformat:0 }}</span> MP &times; <span id="tpFormulaWd">{{ operational.working_days|default:22|floatformat:0 }}</span> Days)</span>
+        </div> -->
       </div>
     </div>
   </div>
@@ -1751,6 +1762,174 @@
   </div>
 </div>
 {% endif %}
+
+<!-- DYNAMIC DAILY OPERATIONS CALENDAR (INTERACTIVE WORKDAYS CALENDAR) -->
+<div class="sp-panel mb-3 shadow-sm" id="opsCalendarSection">
+  <div class="sp-panel-header flex-wrap gap-2">
+    <div>
+      <h6 class="sp-panel-title">
+        <i class="bi bi-calendar3-range-fill text-primary"></i> Daily Operations Calendar
+        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-2 fw-bold"
+          style="font-size: 0.72rem;">
+          <i class="bi bi-briefcase-fill me-1"></i>Working Days (Mon &ndash; Sat)
+        </span>
+      </h6>
+      <div class="text-muted small mt-1" style="font-size: 0.74rem;">
+        Active Project Window: <strong class="text-dark">{{ project.start_date|date:"M d, Y"|default:project.start_date }}</strong> &ndash; <strong class="text-dark">{{ project.end_date|date:"M d, Y"|default:project.end_date }}</strong> &bull; Default Selection: <strong class="text-primary">Today's Current Date</strong>
+      </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <div class="d-inline-flex align-items-center bg-white rounded-pill p-1 border shadow-xs">
+        <button class="btn btn-outline-secondary btn-sm rounded-circle p-0" id="calPrevMonthBtn" title="Previous Month"
+          style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <div class="fw-bold text-navy px-3 text-nowrap" id="calMonthYearTitle"
+          style="font-size: 0.88rem; min-width: 140px; text-align: center;">
+          <i class="bi bi-calendar-event me-1 text-primary"></i>Month Year
+        </div>
+        <button class="btn btn-outline-secondary btn-sm rounded-circle p-0" id="calNextMonthBtn" title="Next Month"
+          style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+      <button class="btn btn-primary btn-sm rounded-pill px-3 shadow-xs text-nowrap" id="calJumpTodayBtn"
+        title="Jump to Today's Current Date">
+        <i class="bi bi-calendar-check me-1"></i>Today
+      </button>
+      <button class="btn btn-outline-secondary btn-sm rounded-pill px-2.5 text-nowrap" id="calJumpLatestBtn"
+        title="Jump to Latest Recorded Date">
+        <i class="bi bi-clock-history me-1"></i>Latest Logged
+      </button>
+    </div>
+  </div>
+
+  <div class="p-3">
+    <div class="row g-3">
+      <!-- CALENDAR GRID COLUMN -->
+      <div class="col-lg-7 border-end-lg">
+        <div class="cal-grid-wrapper">
+          <!-- Weekday Headers -->
+          <div class="cal-weekdays">
+            <div class="cal-weekday">Mon</div>
+            <div class="cal-weekday">Tue</div>
+            <div class="cal-weekday">Wed</div>
+            <div class="cal-weekday">Thu</div>
+            <div class="cal-weekday">Fri</div>
+            <div class="cal-weekday">Sat</div>
+            <div class="cal-weekday sunday" title="Sunday — Non-Working Day">Sun</div>
+          </div>
+
+          <!-- Days container (dynamically rendered) -->
+          <div class="cal-days-grid" id="calDaysGrid">
+            <!-- Rendered by JavaScript -->
+          </div>
+        </div>
+
+        <!-- Visual Legend -->
+        <div class="d-flex align-items-center flex-wrap gap-2 mt-3 pt-2.5 border-top">
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-working"></span> Working Day
+          </span>
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-has-data"></span> Production Logged
+          </span>
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-today"></span> Today Ring
+          </span>
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-selected"></span> Selected Day
+          </span>
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-sunday"></span> Sunday (Non-Working)
+          </span>
+          <span class="cal-legend-chip">
+            <span class="cal-legend-dot bg-out"></span> Outside Window
+          </span>
+        </div>
+      </div>
+
+      <!-- SELECTED DAY INSPECTOR COLUMN -->
+      <div class="col-lg-5">
+        <div class="cal-inspector-card h-100 d-flex flex-column justify-content-between p-3 rounded-3">
+          <div>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom">
+              <div>
+                <div class="text-muted fw-bold small text-uppercase"
+                  style="font-size: 0.68rem; letter-spacing: 0.05em;">
+                  <i class="bi bi-calendar2-day text-primary me-1"></i>Selected Date
+                </div>
+                <div class="fw-bold text-navy fs-6 mt-0.5" id="insDateFormatted">Loading date...</div>
+              </div>
+              <div class="d-flex flex-column align-items-end gap-1">
+                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1"
+                  id="insDayTypeBadge">
+                  <i class="bi bi-briefcase-fill me-1"></i>Working Day
+                </span>
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-0.5"
+                  id="insDataLoggedBadge" style="font-size: 0.68rem;">
+                  Production Recorded
+                </span>
+              </div>
+            </div>
+
+            <!-- 2 HERO STAT TILES -->
+            <div class="row g-2 mb-3">
+              <div class="col-12">
+                <div class="cal-stat-box receipt-box">
+                  <i class="bi bi-box-arrow-in-down cal-stat-watermark text-primary"></i>
+                  <div class="cal-stat-label">
+                    <i class="bi bi-inbox-fill text-primary me-1.5"></i>Daily Branch Receipt
+                  </div>
+                  <div class="cal-stat-number text-primary" id="insBranchReceipt">0</div>
+                  <div class="cal-stat-sub">
+                    <span>Week Total: <strong class="cal-stat-pill text-dark" id="insBrWeek">&mdash;</strong></span>
+                    <span class="text-muted mx-1">|</span>
+                    <span>Month Total: <strong class="cal-stat-pill text-dark" id="insBrMonth">&mdash;</strong></span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12">
+                <div class="cal-stat-box rqc-box">
+                  <i class="bi bi-clipboard-check cal-stat-watermark text-success"></i>
+                  <div class="cal-stat-label">
+                    <i class="bi bi-check2-circle text-success me-1.5"></i>Daily RQC Completed
+                  </div>
+                  <div class="cal-stat-number text-success" id="insRqcCompleted">0</div>
+                  <div class="cal-stat-sub">
+                    <span>Week Total: <strong class="cal-stat-pill text-dark" id="insRqcWeek">&mdash;</strong></span>
+                    <span class="text-muted mx-1">|</span>
+                    <span>Month Total: <strong class="cal-stat-pill text-dark" id="insRqcMonth">&mdash;</strong></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FOOTER ROLLUP SPECS -->
+          <div class="p-2.5 rounded-3 bg-white border shadow-xs">
+            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
+              <span class="text-muted"><i class="bi bi-calendar2-week me-1 text-primary"></i>Active Week:</span>
+              <strong class="text-dark fw-bold" id="insWeekRange">&mdash;</strong>
+            </div>
+            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
+              <span class="text-muted"><i class="bi bi-calendar2-month me-1 text-primary"></i>Active Month:</span>
+              <strong class="text-dark fw-bold" id="insMonthRange">&mdash;</strong>
+            </div>
+            <div class="d-flex align-items-center justify-content-between" style="font-size: 0.74rem;">
+              <span class="text-muted"><i class="bi bi-patch-check-fill me-1 text-success"></i>RQC Quality:</span>
+              <span
+                class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5 fw-bold"
+                id="insQualityScore">{{ operational.rqc_quality_score|default:"—" }}{% if operational.rqc_quality_score %}%{% endif %}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- 5. CORE DELIVERY & RECEPTION STATUS (PROJECT STATUS & BRANCH STATUS) -->
 <div class="row g-3 mb-3">
@@ -2165,173 +2344,6 @@
 </div>
 {% endif %}
 
-<!-- 7. DYNAMIC DAILY OPERATIONS CALENDAR (INTERACTIVE WORKDAYS CALENDAR) -->
-<div class="sp-panel mb-3 shadow-sm" id="opsCalendarSection">
-  <div class="sp-panel-header flex-wrap gap-2">
-    <div>
-      <h6 class="sp-panel-title">
-        <i class="bi bi-calendar3-range-fill text-primary"></i> Daily Operations Calendar
-        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-2 fw-bold"
-          style="font-size: 0.72rem;">
-          <i class="bi bi-briefcase-fill me-1"></i>Working Days (Mon &ndash; Sat)
-        </span>
-      </h6>
-      <div class="text-muted small mt-1" style="font-size: 0.74rem;">
-        Active Project Window: <strong class="text-dark">{{ project.start_date|date:"M d, Y"|default:project.start_date }}</strong> &ndash; <strong class="text-dark">{{ project.end_date|date:"M d, Y"|default:project.end_date }}</strong> &bull; Default Selection: <strong class="text-primary">Today's Current Date</strong>
-      </div>
-    </div>
-
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-      <div class="d-inline-flex align-items-center bg-white rounded-pill p-1 border shadow-xs">
-        <button class="btn btn-outline-secondary btn-sm rounded-circle p-0" id="calPrevMonthBtn" title="Previous Month"
-          style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-          <i class="bi bi-chevron-left"></i>
-        </button>
-        <div class="fw-bold text-navy px-3 text-nowrap" id="calMonthYearTitle"
-          style="font-size: 0.88rem; min-width: 140px; text-align: center;">
-          <i class="bi bi-calendar-event me-1 text-primary"></i>Month Year
-        </div>
-        <button class="btn btn-outline-secondary btn-sm rounded-circle p-0" id="calNextMonthBtn" title="Next Month"
-          style="width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;">
-          <i class="bi bi-chevron-right"></i>
-        </button>
-      </div>
-      <button class="btn btn-primary btn-sm rounded-pill px-3 shadow-xs text-nowrap" id="calJumpTodayBtn"
-        title="Jump to Today's Current Date">
-        <i class="bi bi-calendar-check me-1"></i>Today
-      </button>
-      <button class="btn btn-outline-secondary btn-sm rounded-pill px-2.5 text-nowrap" id="calJumpLatestBtn"
-        title="Jump to Latest Recorded Date">
-        <i class="bi bi-clock-history me-1"></i>Latest Logged
-      </button>
-    </div>
-  </div>
-
-  <div class="p-3">
-    <div class="row g-3">
-      <!-- CALENDAR GRID COLUMN -->
-      <div class="col-lg-7 border-end-lg">
-        <div class="cal-grid-wrapper">
-          <!-- Weekday Headers -->
-          <div class="cal-weekdays">
-            <div class="cal-weekday">Mon</div>
-            <div class="cal-weekday">Tue</div>
-            <div class="cal-weekday">Wed</div>
-            <div class="cal-weekday">Thu</div>
-            <div class="cal-weekday">Fri</div>
-            <div class="cal-weekday">Sat</div>
-            <div class="cal-weekday sunday" title="Sunday — Non-Working Day">Sun</div>
-          </div>
-
-          <!-- Days container (dynamically rendered) -->
-          <div class="cal-days-grid" id="calDaysGrid">
-            <!-- Rendered by JavaScript -->
-          </div>
-        </div>
-
-        <!-- Visual Legend -->
-        <div class="d-flex align-items-center flex-wrap gap-2 mt-3 pt-2.5 border-top">
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-working"></span> Working Day
-          </span>
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-has-data"></span> Production Logged
-          </span>
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-today"></span> Today Ring
-          </span>
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-selected"></span> Selected Day
-          </span>
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-sunday"></span> Sunday (Non-Working)
-          </span>
-          <span class="cal-legend-chip">
-            <span class="cal-legend-dot bg-out"></span> Outside Window
-          </span>
-        </div>
-      </div>
-
-      <!-- SELECTED DAY INSPECTOR COLUMN -->
-      <div class="col-lg-5">
-        <div class="cal-inspector-card h-100 d-flex flex-column justify-content-between p-3 rounded-3">
-          <div>
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom">
-              <div>
-                <div class="text-muted fw-bold small text-uppercase"
-                  style="font-size: 0.68rem; letter-spacing: 0.05em;">
-                  <i class="bi bi-calendar2-day text-primary me-1"></i>Selected Date
-                </div>
-                <div class="fw-bold text-navy fs-6 mt-0.5" id="insDateFormatted">Loading date...</div>
-              </div>
-              <div class="d-flex flex-column align-items-end gap-1">
-                <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1"
-                  id="insDayTypeBadge">
-                  <i class="bi bi-briefcase-fill me-1"></i>Working Day
-                </span>
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-0.5"
-                  id="insDataLoggedBadge" style="font-size: 0.68rem;">
-                  Production Recorded
-                </span>
-              </div>
-            </div>
-
-            <!-- 2 HERO STAT TILES -->
-            <div class="row g-2 mb-3">
-              <div class="col-12">
-                <div class="cal-stat-box receipt-box">
-                  <i class="bi bi-box-arrow-in-down cal-stat-watermark text-primary"></i>
-                  <div class="cal-stat-label">
-                    <i class="bi bi-inbox-fill text-primary me-1.5"></i>Daily Branch Receipt
-                  </div>
-                  <div class="cal-stat-number text-primary" id="insBranchReceipt">0</div>
-                  <div class="cal-stat-sub">
-                    <span>Week Total: <strong class="cal-stat-pill text-dark" id="insBrWeek">&mdash;</strong></span>
-                    <span class="text-muted mx-1">|</span>
-                    <span>Month Total: <strong class="cal-stat-pill text-dark" id="insBrMonth">&mdash;</strong></span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="col-12">
-                <div class="cal-stat-box rqc-box">
-                  <i class="bi bi-clipboard-check cal-stat-watermark text-success"></i>
-                  <div class="cal-stat-label">
-                    <i class="bi bi-check2-circle text-success me-1.5"></i>Daily RQC Completed
-                  </div>
-                  <div class="cal-stat-number text-success" id="insRqcCompleted">0</div>
-                  <div class="cal-stat-sub">
-                    <span>Week Total: <strong class="cal-stat-pill text-dark" id="insRqcWeek">&mdash;</strong></span>
-                    <span class="text-muted mx-1">|</span>
-                    <span>Month Total: <strong class="cal-stat-pill text-dark" id="insRqcMonth">&mdash;</strong></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- FOOTER ROLLUP SPECS -->
-          <div class="p-2.5 rounded-3 bg-white border shadow-xs">
-            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-calendar2-week me-1 text-primary"></i>Active Week:</span>
-              <strong class="text-dark fw-bold" id="insWeekRange">&mdash;</strong>
-            </div>
-            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-calendar2-month me-1 text-primary"></i>Active Month:</span>
-              <strong class="text-dark fw-bold" id="insMonthRange">&mdash;</strong>
-            </div>
-            <div class="d-flex align-items-center justify-content-between" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-patch-check-fill me-1 text-success"></i>RQC Quality:</span>
-              <span
-                class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5 fw-bold"
-                id="insQualityScore">{{ operational.rqc_quality_score|default:"—" }}{% if operational.rqc_quality_score %}%{% endif %}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
 
 
 <!-- SYNC OVERLAY -->
@@ -3066,23 +3078,65 @@
     }
   }
 
+  // Update Leadership Strip: Manpower Used & Headcount for this cycle
+  const mpValEl = document.getElementById("kpiManpowerUsedVal");
+  if (mpValEl) {
+    mpValEl.textContent = (cycle.manpower_used !== null && cycle.manpower_used !== undefined)
+      ? Number(cycle.manpower_used).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : "—";
+  }
+  const hcBrEl = document.getElementById("kpiHeadcountBranchVal");
+  if (hcBrEl) {
+    hcBrEl.textContent = (cycle.headcount_branch !== null && cycle.headcount_branch !== undefined)
+      ? Number(cycle.headcount_branch).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : "0";
+  }
+  const hcInEl = document.getElementById("kpiHeadcountInhouseVal");
+  if (hcInEl) {
+    hcInEl.textContent = (cycle.headcount_inhouse !== null && cycle.headcount_inhouse !== undefined)
+      ? Number(cycle.headcount_inhouse).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : "0";
+  }
+
   // 4. Update KPI 3: Current Throughput
   const tpValEl = document.getElementById("kpiCurrentThroughputVal");
   const tpExpEl = document.getElementById("kpiExpectedThroughputVal");
   const tpGapEl = document.getElementById("kpiThroughputGapVal");
   const tpBadgeContainer = document.getElementById("kpiThroughputBadgeContainer");
+  const tpFormulaMp = document.getElementById("tpFormulaMp");
+  const tpFormulaWd = document.getElementById("tpFormulaWd");
 
-  if (tpValEl) tpValEl.textContent = (cycle.current_throughput !== null && cycle.current_throughput !== undefined) ? Number(cycle.current_throughput).toLocaleString(undefined, { maximumFractionDigits: 0 }) : "0";
-  if (tpExpEl) tpExpEl.textContent = (cycle.expected_throughput !== null && cycle.expected_throughput !== undefined) ? Number(cycle.expected_throughput).toLocaleString(undefined, { maximumFractionDigits: 0 }) : "—";
+  if (tpFormulaMp) {
+    tpFormulaMp.textContent = (cycle.manpower_used !== null && cycle.manpower_used !== undefined)
+      ? Number(cycle.manpower_used).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : "1";
+  }
+  if (tpFormulaWd) {
+    tpFormulaWd.textContent = (cycle.working_days !== null && cycle.working_days !== undefined)
+      ? Number(cycle.working_days).toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : "22";
+  }
+
+  if (tpValEl) {
+    tpValEl.textContent = (cycle.current_throughput !== null && cycle.current_throughput !== undefined)
+      ? Number(cycle.current_throughput).toLocaleString(undefined, { maximumFractionDigits: 2 })
+      : "0";
+    tpValEl.className = "ops-kpi-value mt-1 " + (cycle.target_achieved_status ? "text-success" : "text-danger");
+  }
+  if (tpExpEl) {
+    tpExpEl.textContent = (cycle.expected_throughput !== null && cycle.expected_throughput !== undefined)
+      ? Number(cycle.expected_throughput).toLocaleString(undefined, { maximumFractionDigits: 2 })
+      : "—";
+  }
 
   if (tpGapEl) {
     if (cycle.throughput_gap !== null && cycle.throughput_gap !== undefined) {
       const gap = Number(cycle.throughput_gap);
       if (gap >= 0) {
-        tpGapEl.textContent = "+" + gap.toLocaleString(undefined, { maximumFractionDigits: 0 });
+        tpGapEl.textContent = "+" + gap.toLocaleString(undefined, { maximumFractionDigits: 2 });
         tpGapEl.className = "small fw-bold text-success";
       } else {
-        tpGapEl.textContent = "-" + Math.abs(gap).toLocaleString(undefined, { maximumFractionDigits: 0 });
+        tpGapEl.textContent = "-" + Math.abs(gap).toLocaleString(undefined, { maximumFractionDigits: 2 });
         tpGapEl.className = "small fw-bold text-danger";
       }
     } else {

@@ -170,8 +170,7 @@
             {% else %}
               <span class="text-muted">—</span>
             {% endif %}
-          </td>
-          <td>{{ p.headcount_branch|default:"—" }} / {{ p.headcount_inhouse|default:"—" }}</td>
+          <td>{{ p.headcount_branch|default:p.manpower_used|default:"—" }} / {{ p.headcount_inhouse|default:"—" }}</td>
           <td class="{% if p.variance_vs_plan < 0 %}text-danger{% elif p.variance_vs_plan > 0 %}text-success{% endif %}">
             {% if p.variance_vs_plan is not None %}{% if p.variance_vs_plan >= 0 %}+{% endif %}{{ p.variance_vs_plan|floatformat:0|intcomma }}{% else %}—{% endif %}
           </td>

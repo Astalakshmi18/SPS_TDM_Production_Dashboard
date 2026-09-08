@@ -11,6 +11,7 @@ class ProjectTemplate(models.Model):
 
     project_key = models.SlugField(max_length=50, unique=True, help_text="e.g. BPW, LATVIA, SSH, HOR")
     display_name = models.CharField(max_length=150)
+    customer_name = models.CharField(max_length=150, blank=True, default="")
     branch = models.ForeignKey("branches.Branch", on_delete=models.PROTECT)
     config = models.JSONField(help_text="Field -> extraction rule mapping. See mappings/*.json for examples.")
     is_active = models.BooleanField(default=True)

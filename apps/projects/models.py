@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import json
 import re
@@ -40,6 +41,7 @@ class Project(models.Model):
     promoted = models.BigIntegerField(default=0)
 
     language = models.CharField(max_length=100, blank=True, default="")
+    customer_name = models.CharField("Customer Name", max_length=150, blank=True, default="")
     vendor = models.CharField(max_length=150, blank=True, default="")
     event_type = models.CharField(max_length=150, blank=True, default="")
     ocr_status = models.CharField(max_length=100, blank=True, default="")
@@ -405,7 +407,8 @@ class Project(models.Model):
         # rqc_quality_column_key picker (set once via a project's Insights
         # page) is only used as a fallback for a project whose template
         # hasn't been given daily_metrics rules yet.
-        today = datetime.date.today()
+        today_dt = timezone.localdate()
+        today = today_dt
         # Daily metrics strictly reflect TODAY's actual numbers
         today_receipt = self.daily_operational_metrics.filter(
             date=today, metric_key=DailyOperationalMetric.METRIC_BRANCH_RECEIPT
@@ -445,58 +448,94 @@ class Project(models.Model):
             except (ValueError, TypeError):
                 pass
 
-        # Throughput metrics:
-        # Expected Throughput = Quoted Throughput * Manpower used * Working Days
-        # Current Throughput = Target Achieved
-        # Target Achieved or not = (Current Throughput >= Expected Throughput)
+        # Throughput metrics per user formula:
+        # Expected Throughput = Quoted Throughput
+        # Current Throughput = Inventory data / Branch Manpower / No. of Working Days
+        # Leaves: Exclude Sundays + Swift ProSys Tamil Calendar holidays
         quoted_throughput = snap.get("quoted_throughput")
-        manpower_used = snap.get("manpower_used")
-        working_days = snap.get("working_days")
-        target_achieved = snap.get("target_achieved")
-
-        # Defensive derivation for existing database snapshots before re-import:
         if quoted_throughput is None:
             if snap.get("expected_throughput") and snap.get("expected_throughput") < 10000:
                 quoted_throughput = snap.get("expected_throughput")
             elif snap.get("throughput_branch"):
                 quoted_throughput = snap.get("throughput_branch")
 
-        if manpower_used is None:
-            manpower_used = snap.get("headcount_branch") or self.branch_manpower_count or None
+        current_key = today_dt.strftime("%Y-%m")
+        current_first = today_dt.replace(day=1)
+        today_label = today_dt.strftime("%B %Y")
 
-        if working_days is None:
-            working_days = snap.get("ai_month_working_days") or None
+        snap_cycles = snap.get("monthly_cycles") or []
+        sorted_snap_cycles = sorted(
+            snap_cycles,
+            key=lambda c: c.get("month_date") or c.get("month_key") or ""
+        )
+        monthly_mp_map = {}
+        running_mp = None
+        running_hc_br = None
+        running_hc_in = None
 
-        if target_achieved is None:
-            raw_curr = snap.get("current_throughput")
-            if raw_curr is not None:
-                if raw_curr < 10000 and manpower_used and working_days:
-                    target_achieved = round(raw_curr * manpower_used * working_days, 2)
-                else:
-                    target_achieved = raw_curr
+        for sc in sorted_snap_cycles:
+            k = sc.get("month_key")
+            mp = sc.get("manpower_used")
+            hc_br = sc.get("headcount_branch")
+            hc_in = sc.get("headcount_inhouse")
 
-        if quoted_throughput and manpower_used and working_days:
-            expected_throughput = round(quoted_throughput * manpower_used * working_days, 2)
-        else:
-            expected_throughput = snap.get("expected_throughput")
+            if mp is not None and float(mp) > 0:
+                running_mp = float(mp)
+            if hc_br is not None and float(hc_br) > 0:
+                running_hc_br = float(hc_br)
+            if hc_in is not None and float(hc_in) > 0:
+                running_hc_in = float(hc_in)
 
-        if target_achieved is not None:
-            current_throughput = target_achieved
-        else:
-            current_throughput = snap.get("current_throughput")
+            eff_mp = float(mp) if (mp is not None and float(mp) > 0) else running_mp
+            eff_hc_br = float(hc_br) if (hc_br is not None and float(hc_br) > 0) else running_hc_br
+            eff_hc_in = float(hc_in) if (hc_in is not None and float(hc_in) > 0) else running_hc_in
 
+            if k:
+                monthly_mp_map[k] = {
+                    "manpower_used": eff_mp,
+                    "headcount_branch": eff_hc_br,
+                    "headcount_inhouse": eff_hc_in,
+                    "working_days": sc.get("working_days"),
+                    "target_achieved": sc.get("target_achieved"),
+                    "per_head_throughput": sc.get("per_head_throughput"),
+                    "current_throughput": sc.get("current_throughput"),
+                    "is_closed": sc.get("is_closed", False),
+                }
+
+        curr_mp_info = monthly_mp_map.get(current_key) or {}
+        curr_manpower = (
+            curr_mp_info.get("manpower_used")
+            or snap.get("manpower_used")
+            or running_mp
+            or snap.get("headcount_branch")
+            or self.branch_manpower_count
+            or 1
+        )
+        branch_manpower = curr_manpower
+        curr_month_working_days = get_month_working_days(today_dt.year, today_dt.month)
+        manpower_used = curr_manpower
+        working_days = curr_month_working_days
+        target_achieved = 0.0
+
+        expected_throughput = float(quoted_throughput) if quoted_throughput is not None else 0.0
+        current_throughput = 0.0
         target_achieved_status = None
         target_achieved_label = "—"
         throughput_gap = None
         throughput_gap_pct = None
-        if expected_throughput is not None and current_throughput is not None:
-            target_achieved_status = bool(current_throughput >= expected_throughput)
-            target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
-            throughput_gap = round(current_throughput - expected_throughput, 2)
-            throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2) if expected_throughput else 0.0
 
-        headcount_branch = snap.get("headcount_branch")
-        headcount_inhouse = snap.get("headcount_inhouse")
+        headcount_branch = (
+            curr_mp_info.get("headcount_branch")
+            or snap.get("headcount_branch")
+            or running_hc_br
+            or self.branch_manpower_count
+        )
+        headcount_inhouse = (
+            curr_mp_info.get("headcount_inhouse")
+            or snap.get("headcount_inhouse")
+            or running_hc_in
+            or self.inhouse_manpower_count
+        )
         planned_run_rate = snap.get("planned_run_rate")
         current_run_rate = snap.get("current_run_rate")
 
@@ -618,11 +657,61 @@ class Project(models.Model):
 
             return default_label or month_key
 
-        today_dt = timezone.localdate()
-        current_first = today_dt.replace(day=1)
-        current_key = today_dt.strftime("%Y-%m")
-        today_label = today_dt.strftime("%B %Y")
         seen_keys = set()
+
+        def _calc_throughput_metrics(cy_key, cy_label, receipts_sum, actual_sum=0.0, is_current_cycle=False):
+            cy_y, cy_m = today_dt.year, today_dt.month
+            try:
+                if cy_key and re.match(r"^\d{4}-\d{2}", str(cy_key)):
+                    parts = str(cy_key).split("-")
+                    cy_y, cy_m = int(parts[0]), int(parts[1])
+                elif cy_label:
+                    p_dt = datetime.datetime.strptime(str(cy_label).strip(), "%B %Y")
+                    cy_y, cy_m = p_dt.year, p_dt.month
+            except Exception:
+                pass
+
+            m_info = monthly_mp_map.get(cy_key) or {}
+            m_mp = (
+                m_info.get("manpower_used")
+                or running_mp
+                or snap.get("manpower_used")
+                or snap.get("headcount_branch")
+                or self.branch_manpower_count
+                or 1
+            )
+
+            sheet_wd = m_info.get("working_days")
+            if sheet_wd and float(sheet_wd) > 0 and not is_current_cycle:
+                m_wd = float(sheet_wd)
+            else:
+                m_wd = get_month_working_days(cy_y, cy_m)
+
+            # User formula:
+            # Current Throughput = Inventory data / Branch Manpower / No. of Working Days
+            if is_current_cycle:
+                inv_data = receipts_sum if receipts_sum > 0 else (actual_sum or 0.0)
+            else:
+                inv_data = m_info.get("target_achieved") if m_info.get("target_achieved") is not None else (actual_sum or receipts_sum or 0.0)
+
+            if m_mp and m_wd and inv_data:
+                curr_tp = round(float(inv_data) / (float(m_mp) * float(m_wd)), 2)
+            else:
+                curr_tp = 0.0
+
+            # User formula: Expected Throughput = Quoted Throughput
+            exp_tp = float(quoted_throughput) if quoted_throughput is not None else 0.0
+
+            if exp_tp and exp_tp > 0:
+                tp_stat = bool(curr_tp >= exp_tp)
+                tp_lbl = "Achieved" if tp_stat else "Not Achieved"
+                tp_gp = round(curr_tp - exp_tp, 2)
+            else:
+                tp_stat = None
+                tp_lbl = "—"
+                tp_gp = None
+
+            return exp_tp, curr_tp, tp_gp, tp_stat, tp_lbl, m_wd, m_mp
 
         for idx, dt in enumerate(delivery_totals):
             m_start = dt.month_start
@@ -636,32 +725,26 @@ class Project(models.Model):
 
             cp = self.operational_plan_panel(cycle_month_start=m_start or dt.month_label)
 
-            # Sourced STRICTLY from this specific month's record in Project Insights (sc)
-            # Never borrow previous month's throughput or plan data!
-            c_exp_tp = sc.get("expected_throughput")
-            c_curr_tp = sc.get("current_throughput")
-            if c_curr_tp is None:
-                c_curr_tp = 0.0
-
-            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
-                c_tp_status = bool(c_curr_tp >= c_exp_tp)
-                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
-                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
-            else:
-                c_tp_status = None
-                c_tp_label = "—"
-                c_tp_gap = None
-
             mdm = monthly_daily_metrics.get(m_key) or {}
             c_receipts_total = mdm.get("branch_receipt", 0.0)
             c_rqc_total = mdm.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(m_key, dt.month_label or m_key)
+
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+                m_key, dt.month_label, c_receipts_total, cp["monthly_actual"], is_current_cycle=is_curr
+            )
+            m_info = monthly_mp_map.get(m_key) or {}
+            c_hc_br = m_info.get("headcount_branch") or headcount_branch
+            c_hc_in = m_info.get("headcount_inhouse") or headcount_inhouse
 
             available_cycles.append({
                 "month_key": m_key,
                 "month_label": dt.month_label or m_key,
                 "short_label": (dt.month_label.split()[0] if dt.month_label else m_key),
                 "is_current": is_curr,
+                "manpower_used": c_mp,
+                "headcount_branch": c_hc_br,
+                "headcount_inhouse": c_hc_in,
                 "monthly_plan": cp["monthly_plan"],
                 "monthly_actual": cp["monthly_actual"],
                 "monthly_gap": cp["monthly_gap"],
@@ -678,6 +761,7 @@ class Project(models.Model):
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
+                "working_days": c_working_days,
                 "month_receipts_total": c_receipts_total,
                 "month_rqc_total": c_rqc_total,
                 "date_range_label": c_date_range,
@@ -695,30 +779,26 @@ class Project(models.Model):
             is_curr = bool(m_key == current_key)
             sc_cp = self.operational_plan_panel(cycle_month_start=sc.get("month_label"))
 
-            c_exp_tp = sc.get("expected_throughput")
-            c_curr_tp = sc.get("current_throughput")
-            if c_curr_tp is None:
-                c_curr_tp = 0.0
-
-            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
-                c_tp_status = bool(c_curr_tp >= c_exp_tp)
-                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
-                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
-            else:
-                c_tp_status = None
-                c_tp_label = "—"
-                c_tp_gap = None
-
             mdm = monthly_daily_metrics.get(m_key) or {}
             c_receipts_total = mdm.get("branch_receipt", 0.0)
             c_rqc_total = mdm.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(m_key, sc.get("month_label") or m_key)
+
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+                m_key, sc.get("month_label"), c_receipts_total, sc_cp["monthly_actual"] or sc.get("target_achieved"), is_current_cycle=is_curr
+            )
+            m_info = monthly_mp_map.get(m_key) or {}
+            c_hc_br = m_info.get("headcount_branch") or headcount_branch
+            c_hc_in = m_info.get("headcount_inhouse") or headcount_inhouse
 
             available_cycles.append({
                 "month_key": m_key,
                 "month_label": sc.get("month_label") or m_key,
                 "short_label": (sc.get("month_label") or m_key).split()[0],
                 "is_current": is_curr,
+                "manpower_used": c_mp,
+                "headcount_branch": c_hc_br,
+                "headcount_inhouse": c_hc_in,
                 "monthly_plan": sc_cp["monthly_plan"],
                 "monthly_actual": sc_cp["monthly_actual"] if sc_cp["monthly_actual"] else (sc.get("target_achieved") or 0.0),
                 "monthly_gap": sc_cp["monthly_gap"],
@@ -735,6 +815,7 @@ class Project(models.Model):
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
+                "working_days": c_working_days,
                 "month_receipts_total": c_receipts_total,
                 "month_rqc_total": c_rqc_total,
                 "date_range_label": c_date_range,
@@ -743,27 +824,26 @@ class Project(models.Model):
         if current_key not in seen_keys:
             cp_curr = self.operational_plan_panel(cycle_month_start=current_first)
             sc_curr = snap_cycles_by_key.get(current_key) or {}
-            c_exp_tp = sc_curr.get("expected_throughput")
-            c_curr_tp = sc_curr.get("current_throughput") or 0.0
-            if c_exp_tp and c_curr_tp is not None and c_exp_tp > 0:
-                c_tp_status = bool(c_curr_tp >= c_exp_tp)
-                c_tp_label = "Achieved" if c_tp_status else "Not Achieved"
-                c_tp_gap = round(c_curr_tp - c_exp_tp, 2)
-            else:
-                c_tp_status = None
-                c_tp_label = "—"
-                c_tp_gap = None
 
             mdm_curr = monthly_daily_metrics.get(current_key) or {}
             c_receipts_total = mdm_curr.get("branch_receipt", 0.0)
             c_rqc_total = mdm_curr.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(current_key, today_label)
 
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+                current_key, today_label, c_receipts_total, cp_curr.get("monthly_actual"), is_current_cycle=True
+            )
+            c_hc_br = curr_mp_info.get("headcount_branch") or headcount_branch
+            c_hc_in = curr_mp_info.get("headcount_inhouse") or headcount_inhouse
+
             available_cycles.insert(0, {
                 "month_key": current_key,
                 "month_label": today_label,
                 "short_label": today_dt.strftime("%b"),
                 "is_current": True,
+                "manpower_used": c_mp,
+                "headcount_branch": c_hc_br,
+                "headcount_inhouse": c_hc_in,
                 "monthly_plan": cp_curr.get("monthly_plan", 0),
                 "monthly_actual": cp_curr.get("monthly_actual", 0),
                 "monthly_gap": cp_curr.get("monthly_gap"),
@@ -780,6 +860,7 @@ class Project(models.Model):
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
+                "working_days": c_working_days,
                 "month_receipts_total": c_receipts_total,
                 "month_rqc_total": c_rqc_total,
                 "date_range_label": c_date_range,
@@ -814,6 +895,16 @@ class Project(models.Model):
             throughput_gap = active_cycle.get("throughput_gap")
             target_achieved_status = active_cycle.get("target_achieved_status")
             target_achieved_label = active_cycle.get("target_achieved_label", "—")
+            throughput_gap_pct = (
+                round((throughput_gap / expected_throughput) * 100, 2)
+                if throughput_gap is not None and expected_throughput
+                else 0.0
+            )
+            target_achieved = current_throughput
+            working_days = active_cycle.get("working_days", curr_month_working_days)
+            manpower_used = active_cycle.get("manpower_used", curr_manpower)
+            headcount_branch = active_cycle.get("headcount_branch", headcount_branch)
+            headcount_inhouse = active_cycle.get("headcount_inhouse", headcount_inhouse)
 
         return {
             "project": self,
@@ -1218,26 +1309,77 @@ class Project(models.Model):
 
     @property
     def status(self):
-        """3-state Red / Yellow / Green, driven purely by Delivered % vs the
-        Project End Date (per branch requirement):
+        """3-state Red / Yellow / Green, driven by Delivered % vs the
+        Project End Date combined with milestone checkpoints health:
           Green  = 100% delivered, OR comfortably on pace against the
-                   working-days-elapsed fraction (timeline_percent).
-          Yellow = mildly behind pace but the end date hasn't passed yet.
-          Red    = meaningfully behind pace, or the end date has already
-                   passed without hitting 100%.
-        Bands are intentionally tight (10 / 25) so a project only sits in
-        Yellow for a real, small slip - not by default."""
+                   working-days-elapsed fraction (timeline_percent) AND
+                   all active milestone checkpoints are on track.
+          Yellow = mildly behind pace OR any active milestone checkpoint is At Risk.
+          Red    = meaningfully behind pace, milestone missed, or the end date
+                   has already passed without hitting 100%.
+        """
         if self.delivery_percent >= 100:
             return "green"
         today = timezone.localdate()
         if today > self.end_date:
             return "red"
+
+        # 1. Pace against working-days timeline
         gap = self.timeline_percent - self.delivery_percent
         if gap <= 10:
+            pace_status = "green"
+        elif gap <= 25:
+            pace_status = "yellow"
+        else:
+            pace_status = "red"
+
+        # 2. Check milestone checkpoints health (if any active milestone is at risk or missed,
+        # overall project health must reflect that risk).
+        try:
+            checkpoints = self.milestone_shipment_checkpoints()
+            active_ms_statuses = []
+            for cp in checkpoints:
+                if today <= cp["date"]:
+                    active_ms_statuses.append(cp["status"])
+                else:
+                    # Past checkpoint: if overall delivery hasn't reached target yet, it is missed
+                    target_pct = float(str(cp["label"]).replace("%", "").strip() or 0)
+                    if self.delivery_percent < target_pct:
+                        active_ms_statuses.append("red")
+
+            all_statuses = [pace_status] + active_ms_statuses
+            if "red" in all_statuses:
+                return "red"
+            if "yellow" in all_statuses:
+                return "yellow"
             return "green"
-        if gap <= 25:
-            return "yellow"
-        return "red"
+        except Exception:
+            return pace_status
+
+    @property
+    def status_label(self):
+        """Human-readable status label matching the milestone dashboard legend."""
+        labels = {
+            "green": "On Track",
+            "yellow": "At Risk",
+            "red": "Behind",
+        }
+        return labels.get(self.status, self.status.title())
+
+    @property
+    def effective_customer_name(self):
+        """Returns customer_name if set on Project, otherwise falls back to the
+        matching ProjectTemplate.customer_name."""
+        if self.customer_name:
+            return self.customer_name
+        try:
+            from apps.mapping.models import ProjectTemplate
+            t = ProjectTemplate.objects.filter(project_key=self.project_key).first()
+            if t and t.customer_name:
+                return t.customer_name
+        except Exception:
+            pass
+        return ""
 
     @property
     def unit(self):
@@ -1440,13 +1582,74 @@ MILESTONE_STATUS_LABELS = {
 }
 
 
+# SWIFT ProSys Company Holidays (Tamil Calendar)
+# Standard fixed holidays that apply across years:
+SWIFT_PROSYS_ANNUAL_HOLIDAYS = {
+    (1, 1): "New Year",
+    (1, 15): "Pongal",
+    (1, 16): "Pongal Day 2",
+    (1, 26): "Republic Day",
+    (4, 14): "Tamil New Year",
+    (5, 1): "May Day",
+    (8, 15): "Independence Day",
+    (9, 14): "Vinayakar Chathurthi",
+    (10, 2): "Gandhi Jayanti",
+    (10, 19): "Ayutha Pooja",
+    (10, 20): "Saraswathi Pooja",  # User explicitly requested to add Saraswathi Pooja
+    (11, 8): "Diwali",
+    (11, 9): "Diwali Day 2",
+}
+
+# Moveable Tamil calendar festival dates by year (with 2026 exactly matching the company holiday sheet):
+SWIFT_PROSYS_YEAR_HOLIDAYS = {
+    2026: {
+        (9, 14): "Vinayakar Chathurthi",
+        (10, 19): "Ayutha Pooja",
+        (10, 20): "Saraswathi Pooja",
+        (11, 8): "Diwali",
+        (11, 9): "Diwali Day 2",
+    },
+    2025: {
+        (8, 27): "Vinayakar Chathurthi",
+        (10, 1): "Ayutha Pooja",
+        (10, 2): "Saraswathi Pooja",
+        (10, 20): "Diwali",
+        (10, 21): "Diwali Day 2",
+    },
+}
+
+
+def is_company_holiday(d):
+    """Check if date d is a Swift ProSys company holiday (Tamil Calendar list)."""
+    if d.year in SWIFT_PROSYS_YEAR_HOLIDAYS:
+        yr_holidays = SWIFT_PROSYS_YEAR_HOLIDAYS[d.year]
+        if (d.month, d.day) in yr_holidays:
+            return True
+    return (d.month, d.day) in SWIFT_PROSYS_ANNUAL_HOLIDAYS
+
+
+def get_month_working_days(year, month):
+    """Return total working days in given (year, month), excluding Sundays and Swift ProSys holidays."""
+    _, num_days = calendar.monthrange(year, month)
+    wd = 0
+    for day in range(1, num_days + 1):
+        cur = datetime.date(year, month, day)
+        if cur.weekday() != 6 and not is_company_holiday(cur):
+            wd += 1
+    return wd
+
+
 def _working_days(start, end):
-    """NETWORKDAYS.INTL(start, end, "0000001") equivalent: every day except Sunday."""
+    """Working days between start and end inclusive: every day except Sunday and company holidays."""
     if end < start:
         return 0
     total_days = (end - start).days + 1
-    sundays = sum(1 for i in range(total_days) if (start + datetime.timedelta(days=i)).weekday() == 6)
-    return total_days - sundays
+    wd = 0
+    for i in range(total_days):
+        cur = start + datetime.timedelta(days=i)
+        if cur.weekday() != 6 and not is_company_holiday(cur):
+            wd += 1
+    return wd
 
 
 class ImportBatch(models.Model):

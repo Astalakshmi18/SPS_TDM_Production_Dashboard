@@ -584,6 +584,7 @@ def project_create(request):
                 batches_being_keyed=_safe_int(data.get("batches_being_keyed")),
                 promoted=_safe_int(data.get("promoted")),
                 language=data.get("language", ""),
+                customer_name=data.get("customer_name", "").strip(),
                 vendor=data.get("vendor", ""),
                 event_type=data.get("event_type", ""),
                 ocr_status=data.get("ocr_status", ""),
@@ -627,6 +628,7 @@ def project_edit(request, pk):
             project.batches_being_keyed = _safe_int(data.get("batches_being_keyed"))
             project.promoted = _safe_int(data.get("promoted"))
             project.language = data.get("language", "")
+            project.customer_name = data.get("customer_name", "").strip()
             project.vendor = data.get("vendor", "")
             project.event_type = data.get("event_type", "")
             project.ocr_status = data.get("ocr_status", "")

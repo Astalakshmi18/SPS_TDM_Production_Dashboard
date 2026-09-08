@@ -241,6 +241,23 @@ def _read_project_insights_ops(wb):
         elif a == "" and b == "branch" and len(vals) > 2 and _norm_label(vals[2]) == "inhouse":
             headcount_header_idx = i
 
+    table2_by_month = {}
+    last_table2_row = None
+    if headcount_header_idx is not None:
+        for vals in rows[headcount_header_idx + 1:]:
+            if not vals or (vals[0] is None and all(v is None for v in vals[1:5])):
+                break  # blank row - table's over
+            last_table2_row = vals
+            m_key_t2, m_lbl_t2, _ = _parse_month_cell(vals[0])
+            row_dict = {
+                "throughput_branch": _num(vals[1]) if len(vals) > 1 else None,
+                "throughput_inhouse": _num(vals[2]) if len(vals) > 2 else None,
+                "headcount_branch": _num(vals[3]) if len(vals) > 3 else None,
+                "headcount_inhouse": _num(vals[4]) if len(vals) > 4 else None,
+            }
+            if m_key_t2:
+                table2_by_month[m_key_t2] = row_dict
+
     if monthly_header_idx is not None:
         monthly_cycles = []
         for vals in rows[monthly_header_idx + 1:]:
@@ -261,14 +278,19 @@ def _read_project_insights_ops(wb):
                 quoted_tp = per_head_tp - gap_val
                 out["quoted_throughput"] = quoted_tp
 
-            if quoted_tp and manpower_used and working_days:
-                expected_tp = round(quoted_tp * manpower_used * working_days, 2)
-            elif quoted_tp:
-                expected_tp = quoted_tp
-            else:
-                expected_tp = None
+            # User formula: Expected Throughput = Quoted Throughput
+            expected_tp = quoted_tp if quoted_tp is not None else None
 
-            current_tp = target_achieved if target_achieved is not None else 0.0
+            # Current Throughput = Inventory data / Branch Manpower / Working Days
+            if target_achieved is not None and manpower_used and working_days:
+                current_tp = round(target_achieved / (manpower_used * working_days), 2)
+            elif per_head_tp is not None:
+                current_tp = per_head_tp
+            elif target_achieved is not None:
+                current_tp = target_achieved
+            else:
+                current_tp = 0.0
+
             tp_status = bool(current_tp >= expected_tp) if (expected_tp and current_tp is not None) else None
             tp_gap = round(current_tp - expected_tp, 2) if (expected_tp is not None and current_tp is not None) else None
             tp_gap_pct = round((tp_gap / expected_tp) * 100, 2) if (expected_tp and tp_gap is not None) else 0.0
@@ -289,20 +311,54 @@ def _read_project_insights_ops(wb):
                 "throughput_gap_pct": tp_gap_pct,
                 "is_closed": bool(target_achieved is not None and target_achieved > 0),
             })
+
+        # Match Table 2 headcount and track running previous-month manpower
+        last_valid_manpower = None
+        last_valid_hc_branch = None
+        last_valid_hc_inhouse = None
+        last_valid_tp_branch = None
+        last_valid_tp_inhouse = None
+
+        for c in monthly_cycles:
+            t2 = table2_by_month.get(c["month_key"]) or {}
+            c["throughput_branch"] = t2.get("throughput_branch")
+            c["throughput_inhouse"] = t2.get("throughput_inhouse")
+            c["headcount_branch"] = t2.get("headcount_branch")
+            c["headcount_inhouse"] = t2.get("headcount_inhouse")
+
+            if c.get("manpower_used") and float(c["manpower_used"]) > 0:
+                last_valid_manpower = float(c["manpower_used"])
+            if c.get("headcount_branch") and float(c["headcount_branch"]) > 0:
+                last_valid_hc_branch = float(c["headcount_branch"])
+            if c.get("headcount_inhouse") and float(c["headcount_inhouse"]) > 0:
+                last_valid_hc_inhouse = float(c["headcount_inhouse"])
+            if c.get("throughput_branch") and float(c["throughput_branch"]) > 0:
+                last_valid_tp_branch = float(c["throughput_branch"])
+            if c.get("throughput_inhouse") and float(c["throughput_inhouse"]) > 0:
+                last_valid_tp_inhouse = float(c["throughput_inhouse"])
+
+            c["effective_manpower"] = c.get("manpower_used") or last_valid_manpower
+
         out["monthly_cycles"] = monthly_cycles
 
-        # Strictly use CURRENT MONTH cycle (e.g. Sep 2026 if today is in Sep 2026).
-        # NEVER fall back to previous month (e.g. Aug) data when current month has no data!
+        # User rule: If Current Month has manpower details, use them;
+        # otherwise, fall back to the most recent Previous Month's data!
         import datetime
         today = datetime.date.today()
         today_key = today.strftime("%Y-%m")
         current_cycle = next((c for c in monthly_cycles if c["month_key"] == today_key), None)
 
+        eff_mp = (current_cycle.get("manpower_used") if current_cycle else None) or last_valid_manpower
+        eff_hc_br = (current_cycle.get("headcount_branch") if current_cycle else None) or last_valid_hc_branch
+        eff_hc_in = (current_cycle.get("headcount_inhouse") if current_cycle else None) or last_valid_hc_inhouse
+        eff_tp_br = (current_cycle.get("throughput_branch") if current_cycle else None) or last_valid_tp_branch
+        eff_tp_in = (current_cycle.get("throughput_inhouse") if current_cycle else None) or last_valid_tp_inhouse
+
         if current_cycle:
             out["month_label"] = current_cycle["month_label"]
             out["month_key"] = current_cycle["month_key"]
             out["target_achieved"] = current_cycle["target_achieved"]
-            out["manpower_used"] = current_cycle["manpower_used"]
+            out["manpower_used"] = eff_mp
             out["working_days"] = current_cycle["working_days"]
             out["per_head_throughput"] = current_cycle["per_head_throughput"]
             out["expected_throughput"] = current_cycle["expected_throughput"]
@@ -310,32 +366,39 @@ def _read_project_insights_ops(wb):
             out["target_achieved_status"] = current_cycle["target_achieved_status"]
             out["throughput_gap"] = current_cycle["throughput_gap"]
             out["throughput_gap_pct"] = current_cycle["throughput_gap_pct"]
+            current_cycle["manpower_used"] = eff_mp
         else:
-            # Current month does not have a data row in Project Insights yet:
-            # Show ONLY current month's real data (0/empty), never previous month's numbers!
             out["month_label"] = today.strftime("%B %Y")
             out["month_key"] = today_key
             out["target_achieved"] = None
-            out["manpower_used"] = None
+            out["manpower_used"] = eff_mp
             out["working_days"] = None
             out["per_head_throughput"] = None
-            out["expected_throughput"] = None
+            out["expected_throughput"] = out.get("quoted_throughput")
             out["current_throughput"] = 0.0
             out["target_achieved_status"] = None
             out["throughput_gap"] = None
             out["throughput_gap_pct"] = None
 
-    if headcount_header_idx is not None:
-        last_row = None
-        for vals in rows[headcount_header_idx + 1:]:
-            if not vals or (vals[0] is None and all(v is None for v in vals[1:5])):
-                break  # blank row - table's over
-            last_row = vals
-        if last_row:
-            out["throughput_branch"] = _num(last_row[1]) if len(last_row) > 1 else None
-            out["throughput_inhouse"] = _num(last_row[2]) if len(last_row) > 2 else None
-            out["headcount_branch"] = _num(last_row[3]) if len(last_row) > 3 else None
-            out["headcount_inhouse"] = _num(last_row[4]) if len(last_row) > 4 else None
+        if eff_tp_br is not None:
+            out["throughput_branch"] = eff_tp_br
+        if eff_tp_in is not None:
+            out["throughput_inhouse"] = eff_tp_in
+        if eff_hc_br is not None:
+            out["headcount_branch"] = eff_hc_br
+        if eff_hc_in is not None:
+            out["headcount_inhouse"] = eff_hc_in
+
+    # Fallback for Table 2 if not set from cycles
+    if last_table2_row:
+        if out.get("throughput_branch") is None and len(last_table2_row) > 1:
+            out["throughput_branch"] = _num(last_table2_row[1])
+        if out.get("throughput_inhouse") is None and len(last_table2_row) > 2:
+            out["throughput_inhouse"] = _num(last_table2_row[2])
+        if out.get("headcount_branch") is None and len(last_table2_row) > 3:
+            out["headcount_branch"] = _num(last_table2_row[3])
+        if out.get("headcount_inhouse") is None and len(last_table2_row) > 4:
+            out["headcount_inhouse"] = _num(last_table2_row[4])
 
     return out
 
@@ -481,6 +544,7 @@ def run_import(template, uploaded_file, django_file_field_path, user,
         "batches_being_keyed": _safe_int(values.get("batches_being_keyed")),
         "promoted": _safe_int(values.get("promoted")),
         "language": values.get("language") or "",
+        "customer_name": (getattr(template, "customer_name", "") or values.get("customer_name") or ""),
         "vendor": values.get("vendor") or "",
         "event_type": values.get("event_type") or "",
         "ocr_status": values.get("ocr_status") or "",

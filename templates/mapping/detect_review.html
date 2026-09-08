@@ -46,13 +46,17 @@
       <form method="post" action="{% url 'mapping:auto_detect_save' %}">
         {% csrf_token %}
         <div class="row g-2 mb-2">
-          <div class="col-6">
+          <div class="col-4">
             <label class="form-label small">Project Key</label>
             <input name="project_key" class="form-control form-control-sm" placeholder="e.g. SSH" required>
           </div>
-          <div class="col-6">
+          <div class="col-4">
             <label class="form-label small">Display Name</label>
             <input name="display_name" class="form-control form-control-sm" placeholder="e.g. SSH Project">
+          </div>
+          <div class="col-4">
+            <label class="form-label small">Customer Name</label>
+            <input name="customer_name" class="form-control form-control-sm" placeholder="e.g. Ancestry">
           </div>
         </div>
         <div class="mb-2">

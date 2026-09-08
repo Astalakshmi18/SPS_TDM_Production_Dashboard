@@ -1,6 +1,7 @@
 {
   "project_key": "BPW",
   "display_name": "British Prisoner of War",
+  "customer_name": "MH",
   "branch": "TDM",
   "config": {
     "project_name": {

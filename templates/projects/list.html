@@ -78,7 +78,7 @@
           </td>
           <td>
             <span class="status-dot status-{{ p.status }}"></span>
-            <span class="fw-semibold small text-capitalize">{{ p.status }}</span>
+            <span class="fw-semibold small text-capitalize">{{ p.status_label|default:p.status }}</span>
           </td>
           <td class="text-end">
             <div class="btn-group btn-group-sm">

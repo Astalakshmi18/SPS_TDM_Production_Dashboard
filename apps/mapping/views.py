@@ -10,12 +10,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from apps.accounts.decorators import accessible_branches, branch_queryset, role_required
 from apps.accounts.models import UserProfile
 from apps.branches.models import Branch
+from apps.projects.models import Project
 from .autodetect import detect_mapping
 from .engine import apply_mapping
 from .models import ProjectTemplate
 
 
-def _save_template_to_disk(project_key, display_name, branch_code, config):
+def _save_template_to_disk(project_key, display_name, branch_code, config, customer_name=""):
     """Every save-and-reuse also writes the mapping out as a JSON file in
     /mappings, not just the DB row - so it survives a fresh `seed_data` /
     `sync_from_disk` run and can be committed to version control like the
@@ -23,6 +24,7 @@ def _save_template_to_disk(project_key, display_name, branch_code, config):
     data = {
         "project_key": project_key,
         "display_name": display_name,
+        "customer_name": customer_name,
         "branch": branch_code,
         "config": config,
     }
@@ -49,6 +51,7 @@ def template_list(request):
                         project_key=data["project_key"],
                         defaults={
                             "display_name": data.get("display_name", data["project_key"]),
+                            "customer_name": data.get("customer_name", ""),
                             "branch": branch,
                             "config": data["config"],
                         },
@@ -87,10 +90,13 @@ def sync_from_disk(request):
                         project_key=data["project_key"],
                         defaults={
                             "display_name": data.get("display_name", data["project_key"]),
+                            "customer_name": data.get("customer_name", ""),
                             "branch": branch,
                             "config": data["config"],
                         },
                     )
+                    if data.get("customer_name"):
+                        Project.objects.filter(project_key=data["project_key"]).update(customer_name=data["customer_name"])
                     created += int(was_created)
                     updated += int(not was_created)
             except Exception as exc:
@@ -110,6 +116,7 @@ def template_create(request):
     if request.method == "POST":
         project_key = request.POST.get("project_key", "").strip().upper()
         display_name = request.POST.get("display_name", "").strip()
+        customer_name = request.POST.get("customer_name", "").strip()
         branch_code = request.POST.get("branch", "")
         config_text = request.POST.get("config", "{}")
         branch = Branch.objects.filter(code=branch_code).first() or Branch.objects.first()
@@ -118,7 +125,8 @@ def template_create(request):
             messages.error(request, "You don't have access to create templates for that branch.")
             return render(request, "mapping/form.html", {
                 "mode": "create", "branches": branches,
-                "project_key": project_key, "display_name": display_name, "config_text": config_text,
+                "project_key": project_key, "display_name": display_name,
+                "customer_name": customer_name, "config_text": config_text,
             })
 
         try:
@@ -127,14 +135,17 @@ def template_create(request):
             messages.error(request, f"Config isn't valid JSON: {exc}")
             return render(request, "mapping/form.html", {
                 "mode": "create", "branches": branches,
-                "project_key": project_key, "display_name": display_name, "config_text": config_text,
+                "project_key": project_key, "display_name": display_name,
+                "customer_name": customer_name, "config_text": config_text,
             })
 
         ProjectTemplate.objects.update_or_create(
             project_key=project_key,
-            defaults={"display_name": display_name, "branch": branch, "config": config},
+            defaults={"display_name": display_name, "customer_name": customer_name, "branch": branch, "config": config},
         )
-        _save_template_to_disk(project_key, display_name, branch.code if branch else "TDM", config)
+        _save_template_to_disk(project_key, display_name, branch.code if branch else "TDM", config, customer_name=customer_name)
+        if customer_name:
+            Project.objects.filter(project_key=project_key).update(customer_name=customer_name)
         messages.success(request, f"Template '{project_key}' created.")
         return redirect("mapping:list")
 
@@ -148,6 +159,7 @@ def template_edit(request, pk):
 
     if request.method == "POST":
         display_name = request.POST.get("display_name", "").strip()
+        customer_name = request.POST.get("customer_name", "").strip()
         branch_code = request.POST.get("branch", "")
         config_text = request.POST.get("config", "{}")
         is_active = bool(request.POST.get("is_active"))
@@ -157,7 +169,7 @@ def template_edit(request, pk):
             messages.error(request, "You don't have access to move this template to that branch.")
             return render(request, "mapping/form.html", {
                 "mode": "edit", "template": template, "branches": branches,
-                "display_name": display_name, "config_text": config_text,
+                "display_name": display_name, "customer_name": customer_name, "config_text": config_text,
             })
 
         try:
@@ -166,15 +178,18 @@ def template_edit(request, pk):
             messages.error(request, f"Config isn't valid JSON: {exc}")
             return render(request, "mapping/form.html", {
                 "mode": "edit", "template": template, "branches": branches,
-                "display_name": display_name, "config_text": config_text,
+                "display_name": display_name, "customer_name": customer_name, "config_text": config_text,
             })
 
         template.display_name = display_name
+        template.customer_name = customer_name
         template.branch = new_branch
         template.config = config
         template.is_active = is_active
         template.save()
-        _save_template_to_disk(template.project_key, display_name, new_branch.code, config)
+        _save_template_to_disk(template.project_key, display_name, new_branch.code, config, customer_name=customer_name)
+        if customer_name:
+            Project.objects.filter(project_key=template.project_key).update(customer_name=customer_name)
         messages.success(request, f"Template '{template.project_key}' updated.")
         return redirect("mapping:detail", pk=template.pk)
 
@@ -241,6 +256,7 @@ def auto_detect_save(request):
 
     project_key = request.POST.get("project_key", "").strip().upper()
     display_name = request.POST.get("display_name", "").strip() or project_key
+    customer_name = request.POST.get("customer_name", "").strip()
     branch_code = request.POST.get("branch", "")
     config_text = request.POST.get("config", "{}")
 
@@ -261,9 +277,11 @@ def auto_detect_save(request):
 
     template, created = ProjectTemplate.objects.update_or_create(
         project_key=project_key,
-        defaults={"display_name": display_name, "branch": branch, "config": config},
+        defaults={"display_name": display_name, "customer_name": customer_name, "branch": branch, "config": config},
     )
-    _save_template_to_disk(project_key, display_name, branch.code, config)
+    _save_template_to_disk(project_key, display_name, branch.code, config, customer_name=customer_name)
+    if customer_name:
+        Project.objects.filter(project_key=project_key).update(customer_name=customer_name)
 
     messages.success(
         request,
