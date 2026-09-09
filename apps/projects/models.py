@@ -575,7 +575,7 @@ class Project(models.Model):
         target_achieved = 0.0
 
         # Overall Throughput per user formula:
-        # Current Throughput = Total Inventory Data (e.g. S Column Total Count) / (Branch Manpower * Timeline Total Working Days)
+        # Current Throughput = Total Inventory Data (e.g. S Column Total Count) / (Branch Manpower * Timeline Completed Working Days)
         # Quoted Throughput IS Expected Throughput
         total_inv_data = self.get_total_inventory_data()
 
@@ -586,26 +586,27 @@ class Project(models.Model):
             or self.branch_manpower_count
             or 1
         )
-        timeline_days = self.working_days_total or 1
+        timeline_days = self.working_days_completed
 
         if total_inv_data > 0 and branch_mp > 0 and timeline_days > 0:
-            overall_current_throughput = round(float(total_inv_data) / (float(branch_mp) * float(timeline_days)), 2)
+            overall_current_throughput = round(float(total_inv_data) / (float(branch_mp) * float(timeline_days)))
         else:
-            # Fallback for projects without inventory count
+            # Fallback for projects without inventory count or before project start (0 completed days)
             curr_mp = curr_manpower or branch_mp or 1
-            curr_wd = curr_month_working_days or timeline_days or 1
+            curr_wd = curr_month_working_days or (self.working_days_total or 1)
             inv_fallback = branch_receipt if (branch_receipt and branch_receipt > 0) else (plan.get("monthly_actual") or 0.0)
-            if curr_mp and curr_wd and inv_fallback:
-                overall_current_throughput = round(float(inv_fallback) / (float(curr_mp) * float(curr_wd)), 2)
+            if curr_mp and inv_fallback:
+                denom_days = timeline_days if timeline_days > 0 else curr_wd
+                overall_current_throughput = round(float(inv_fallback) / (float(curr_mp) * float(denom_days)))
             else:
-                overall_current_throughput = 0.0
+                overall_current_throughput = 0
 
         expected_throughput = float(quoted_throughput) if quoted_throughput is not None else 0.0
         current_throughput = overall_current_throughput
         if expected_throughput and expected_throughput > 0:
             target_achieved_status = bool(current_throughput >= expected_throughput)
             target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
-            throughput_gap = round(current_throughput - expected_throughput, 2)
+            throughput_gap = round(current_throughput - expected_throughput)
             throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2)
         else:
             target_achieved_status = None
@@ -783,9 +784,9 @@ class Project(models.Model):
                 inv_data = m_info.get("target_achieved") if m_info.get("target_achieved") is not None else (actual_sum or receipts_sum or 0.0)
 
             if m_mp and m_wd and inv_data:
-                month_tp = round(float(inv_data) / (float(m_mp) * float(m_wd)), 2)
+                month_tp = round(float(inv_data) / (float(m_mp) * float(m_wd)))
             else:
-                month_tp = 0.0
+                month_tp = 0
 
             # User formula: Expected Throughput = Quoted Throughput
             # Current Throughput = Overall Throughput across the project
@@ -795,7 +796,7 @@ class Project(models.Model):
             if exp_tp and exp_tp > 0:
                 tp_stat = bool(curr_tp >= exp_tp)
                 tp_lbl = "Achieved" if tp_stat else "Not Achieved"
-                tp_gp = round(curr_tp - exp_tp, 2)
+                tp_gp = round(curr_tp - exp_tp)
             else:
                 tp_stat = None
                 tp_lbl = "—"
@@ -989,7 +990,7 @@ class Project(models.Model):
             if expected_throughput and expected_throughput > 0:
                 target_achieved_status = bool(current_throughput >= expected_throughput)
                 target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
-                throughput_gap = round(current_throughput - expected_throughput, 2)
+                throughput_gap = round(current_throughput - expected_throughput)
                 throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2)
             else:
                 target_achieved_status = None

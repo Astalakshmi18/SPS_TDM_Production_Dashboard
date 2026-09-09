@@ -1374,17 +1374,17 @@
           </span>
         </div>
         <div class="ops-kpi-value {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %} mt-1" id="kpiCurrentThroughputVal">
-          {{ operational.current_throughput|default:"0"|floatformat:"-2"|intcomma }}
+          {{ operational.current_throughput|default:"0"|floatformat:"0"|intcomma }}
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
         <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Expected (Quoted): <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:"-2"|intcomma }}{% else %}—{% endif %}</strong></span>
+          <span class="text-muted small">Expected (Quoted): <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:"0"|intcomma }}{% else %}—{% endif %}</strong></span>
           <span
             class="small fw-bold {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiThroughputGapVal">
             {% if operational.throughput_gap is not None %}
-            {% if operational.throughput_gap >= 0 %}+{% endif %}{{ operational.throughput_gap|floatformat:"-2"|intcomma }}
+            {% if operational.throughput_gap >= 0 %}+{% endif %}{{ operational.throughput_gap|floatformat:"0"|intcomma }}
             {% endif %}
           </span>
         </div>
@@ -3118,13 +3118,13 @@
 
   if (tpValEl) {
     tpValEl.textContent = (cycle.current_throughput !== null && cycle.current_throughput !== undefined)
-      ? Number(cycle.current_throughput).toLocaleString(undefined, { maximumFractionDigits: 2 })
+      ? Number(cycle.current_throughput).toLocaleString(undefined, { maximumFractionDigits: 0 })
       : "0";
     tpValEl.className = "ops-kpi-value mt-1 " + (cycle.target_achieved_status ? "text-success" : "text-danger");
   }
   if (tpExpEl) {
     tpExpEl.textContent = (cycle.expected_throughput !== null && cycle.expected_throughput !== undefined)
-      ? Number(cycle.expected_throughput).toLocaleString(undefined, { maximumFractionDigits: 2 })
+      ? Number(cycle.expected_throughput).toLocaleString(undefined, { maximumFractionDigits: 0 })
       : "—";
   }
 
@@ -3132,10 +3132,10 @@
     if (cycle.throughput_gap !== null && cycle.throughput_gap !== undefined) {
       const gap = Number(cycle.throughput_gap);
       if (gap >= 0) {
-        tpGapEl.textContent = "+" + gap.toLocaleString(undefined, { maximumFractionDigits: 2 });
+        tpGapEl.textContent = "+" + gap.toLocaleString(undefined, { maximumFractionDigits: 0 });
         tpGapEl.className = "small fw-bold text-success";
       } else {
-        tpGapEl.textContent = "-" + Math.abs(gap).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        tpGapEl.textContent = "-" + Math.abs(gap).toLocaleString(undefined, { maximumFractionDigits: 0 });
         tpGapEl.className = "small fw-bold text-danger";
       }
     } else {
