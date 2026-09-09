@@ -354,6 +354,52 @@ def _read_project_insights_ops(wb):
         eff_tp_br = (current_cycle.get("throughput_branch") if current_cycle else None) or last_valid_tp_branch
         eff_tp_in = (current_cycle.get("throughput_inhouse") if current_cycle else None) or last_valid_tp_inhouse
 
+        # Overall Throughput per user formula:
+        # Current Throughput = Total Inventory Data / (Branch Manpower * Total Working Days)
+        closed_rec = sum(
+            float(c["target_achieved"])
+            for c in monthly_cycles
+            if c.get("target_achieved") is not None
+            and float(c["target_achieved"]) > 0
+            and c.get("manpower_used")
+            and float(c["manpower_used"]) > 0
+            and c.get("working_days")
+            and float(c["working_days"]) > 0
+        )
+        closed_md = sum(
+            float(c["manpower_used"]) * float(c["working_days"])
+            for c in monthly_cycles
+            if c.get("target_achieved") is not None
+            and float(c["target_achieved"]) > 0
+            and c.get("manpower_used")
+            and float(c["manpower_used"]) > 0
+            and c.get("working_days")
+            and float(c["working_days"]) > 0
+        )
+        if closed_md > 0 and closed_rec > 0:
+            overall_tp = round(closed_rec / closed_md, 2)
+        else:
+            overall_tp = current_cycle["current_throughput"] if current_cycle else 0.0
+
+        exp_tp = out.get("quoted_throughput")
+        if exp_tp is not None and float(exp_tp) > 0:
+            tp_stat = bool(overall_tp >= float(exp_tp))
+            tp_gap = round(overall_tp - float(exp_tp), 2)
+            tp_gap_pct = round((tp_gap / float(exp_tp)) * 100, 2)
+        else:
+            tp_stat = None
+            tp_gap = None
+            tp_gap_pct = 0.0
+
+        # Maintain month-specific throughput under month_throughput, and set current_throughput to overall
+        for c in monthly_cycles:
+            c["month_throughput"] = c.get("current_throughput")
+            c["current_throughput"] = overall_tp
+            c["expected_throughput"] = exp_tp
+            c["target_achieved_status"] = tp_stat
+            c["throughput_gap"] = tp_gap
+            c["throughput_gap_pct"] = tp_gap_pct
+
         if current_cycle:
             out["month_label"] = current_cycle["month_label"]
             out["month_key"] = current_cycle["month_key"]
@@ -361,11 +407,12 @@ def _read_project_insights_ops(wb):
             out["manpower_used"] = eff_mp
             out["working_days"] = current_cycle["working_days"]
             out["per_head_throughput"] = current_cycle["per_head_throughput"]
-            out["expected_throughput"] = current_cycle["expected_throughput"]
-            out["current_throughput"] = current_cycle["current_throughput"]
-            out["target_achieved_status"] = current_cycle["target_achieved_status"]
-            out["throughput_gap"] = current_cycle["throughput_gap"]
-            out["throughput_gap_pct"] = current_cycle["throughput_gap_pct"]
+            out["expected_throughput"] = exp_tp
+            out["current_throughput"] = overall_tp
+            out["overall_throughput"] = overall_tp
+            out["target_achieved_status"] = tp_stat
+            out["throughput_gap"] = tp_gap
+            out["throughput_gap_pct"] = tp_gap_pct
             current_cycle["manpower_used"] = eff_mp
         else:
             out["month_label"] = today.strftime("%B %Y")
@@ -374,11 +421,12 @@ def _read_project_insights_ops(wb):
             out["manpower_used"] = eff_mp
             out["working_days"] = None
             out["per_head_throughput"] = None
-            out["expected_throughput"] = out.get("quoted_throughput")
-            out["current_throughput"] = 0.0
-            out["target_achieved_status"] = None
-            out["throughput_gap"] = None
-            out["throughput_gap_pct"] = None
+            out["expected_throughput"] = exp_tp
+            out["current_throughput"] = overall_tp
+            out["overall_throughput"] = overall_tp
+            out["target_achieved_status"] = tp_stat
+            out["throughput_gap"] = tp_gap
+            out["throughput_gap_pct"] = tp_gap_pct
 
         if eff_tp_br is not None:
             out["throughput_branch"] = eff_tp_br
@@ -519,6 +567,11 @@ def run_import(template, uploaded_file, django_file_field_path, user,
         # used as a fallback for projects that don't have this configured).
         op_snapshot.update({k: v["value"] for k, v in result.daily_metrics.items()})
         op_snapshot["daily_metrics_as_of"] = {k: v["as_of"] for k, v in result.daily_metrics.items()}
+        op_snapshot["daily_metrics_totals"] = {
+            k: v.get("total_value") for k, v in result.daily_metrics.items() if v.get("total_value") is not None
+        }
+        if "branch_receipt" in result.daily_metrics and result.daily_metrics["branch_receipt"].get("total_value") is not None:
+            op_snapshot["total_branch_receipt"] = result.daily_metrics["branch_receipt"]["total_value"]
 
     # Any operational metrics explicitly configured via Template Mapping take priority:
     for tp_key in ("throughput_branch", "throughput_inhouse", "quoted_throughput"):

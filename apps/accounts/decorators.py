@@ -19,7 +19,12 @@ def role_required(*allowed_roles):
         @login_required
         def _wrapped(request, *args, **kwargs):
             profile = getattr(request.user, "profile", None)
-            if not profile or profile.role not in allowed_roles:
+            is_allowed = False
+            if profile and profile.role in allowed_roles:
+                is_allowed = True
+            elif request.user.is_superuser and "ADMIN" in allowed_roles:
+                is_allowed = True
+            if not is_allowed:
                 messages.error(request, "You do not have permission to access that page.")
                 return redirect("dashboard:home")
             return view_func(request, *args, **kwargs)
@@ -94,8 +99,8 @@ def require_branch_access(request, branch):
 
 def accessible_branches(request):
     """The queryset of Branch objects this user may act on - use this to
-    populate branch <select> dropdowns so a Manager/Viewer is never even
-    shown a branch they can't touch."""
+    populate branch <select> dropdowns so a user only sees branches they
+    actually have access to and have allocated projects in."""
     from apps.branches.models import Branch
 
     profile = getattr(request.user, "profile", None)
@@ -103,4 +108,9 @@ def accessible_branches(request):
         return Branch.objects.none()
     if profile.is_admin:
         return Branch.objects.all()
-    return profile.branches.all()
+
+    user_branches = profile.branches.all()
+    assigned_branch_ids = profile.projects.values_list("branch_id", flat=True)
+    if assigned_branch_ids.exists():
+        return user_branches.filter(id__in=assigned_branch_ids)
+    return user_branches

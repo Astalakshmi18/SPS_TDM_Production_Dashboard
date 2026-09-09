@@ -20,12 +20,14 @@
       </a>
     </li>
 
+    {% if user.profile.is_admin %}
     <li class="nav-item">
       <a class="nav-link {% if request.resolver_match.app_name == 'inventory' %}active{% endif %}" href="{% url 'inventory:list' %}" title="Inventory Tracker">
         <i class="bi bi-boxes"></i>
         <span class="sp-nav-text">Inventory Tracker</span>
       </a>
     </li>
+    {% endif %}
     <li class="nav-item">
       <a class="nav-link {% if request.resolver_match.app_name == 'projects' and request.resolver_match.url_name == 'list' %}active{% endif %}" href="{% url 'projects:list' %}" title="Projects">
         <i class="bi bi-kanban"></i>
@@ -56,12 +58,14 @@
       </a>
     </li>
     {% endif %}
+    {% if user.profile.is_admin %}
     <li class="nav-item">
       <a class="nav-link {% if request.resolver_match.app_name == 'branches' %}active{% endif %}" href="{% url 'branches:list' %}" title="Branches">
         <i class="bi bi-diagram-2"></i>
         <span class="sp-nav-text">Branches</span>
       </a>
     </li>
+    {% endif %}
     {% if user.profile.is_admin %}
     <li class="nav-item">
       <a class="nav-link {% if request.resolver_match.url_name == 'user_list' %}active{% endif %}" href="{% url 'accounts:user_list' %}" title="Users">

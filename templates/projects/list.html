@@ -1,102 +1,373 @@
 {% extends "base/base.html" %}
+{% load humanize %}
+
 {% block content %}
+<!-- Page Header -->
 <div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2 mb-3">
-  <h4 class="fw-bold mb-0 text-nowrap" style="color: var(--sp-navy)"><i class="bi bi-kanban-fill me-2"></i>Projects</h4>
+  <div>
+    <h4 class="fw-bold mb-1 text-navy d-flex align-items-center gap-2">
+      <i class="bi bi-kanban-fill text-primary"></i> Projects Directory
+    </h4>
+    <span class="text-muted small">Monitor, track delivery progress, and manage active production projects</span>
+  </div>
   <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
     {% if user.profile.can_edit_projects %}
     <form method="post" action="{% url 'projects:sync_all' %}" class="d-inline mb-0">
       {% csrf_token %}
-      <button class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-arrow-repeat me-1"></i> Sync All</button>
+      <button class="btn btn-outline-success btn-sm rounded-pill px-3 shadow-sm text-nowrap">
+        <i class="bi bi-arrow-repeat me-1"></i> Sync All
+      </button>
     </form>
     {% endif %}
     {% if user.profile.can_create_projects %}
-    <a href="{% url 'projects:create' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-plus-lg me-1"></i> New Project</a>
-    <a href="{% url 'projects:upload' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap"><i class="bi bi-cloud-arrow-up-fill me-1"></i> Import Data</a>
+    <a href="{% url 'projects:create' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap">
+      <i class="bi bi-plus-lg me-1"></i> New Project
+    </a>
+    <a href="{% url 'projects:upload' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm text-nowrap" style="background: var(--sp-navy, #0f2c59);">
+      <i class="bi bi-cloud-arrow-up-fill me-1"></i> Import Data
+    </a>
     {% endif %}
   </div>
 </div>
 
-<div class="sp-panel">
-  <form method="get" class="row g-2 align-items-center mb-3">
-    <div class="{% if show_branch_filter %}col-md-5{% else %}col-md-9{% endif %}">
+<!-- Main Projects Container Panel -->
+<div class="sp-panel shadow-sm">
+  <!-- Search, Filter & View Controls Bar -->
+  <form method="get" class="row g-2 align-items-center mb-3 pb-3 border-bottom" id="projectFilterForm">
+    <!-- Search Box -->
+    <div class="col-12 col-md-5 col-lg-4">
       <div class="input-group input-group-sm">
         <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
-        <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm" placeholder="Search project name...">
+        <input type="text" name="q" id="projectSearchInput" value="{{ q }}" class="form-control" placeholder="Search project name, GM, PM..." onkeyup="spLiveFilterProjects()">
+        {% if q %}
+        <a href="{% url 'projects:list' %}" class="btn btn-outline-secondary" title="Clear Search">
+          <i class="bi bi-x-lg"></i>
+        </a>
+        {% endif %}
       </div>
     </div>
+
+    <!-- Branch Filter -->
     {% if show_branch_filter %}
-    <div class="col-md-4">
-      <select name="branch" class="form-select form-select-sm">
+    <div class="col-6 col-md-3 col-lg-2">
+      <select name="branch" class="form-select form-select-sm" onchange="this.form.submit()">
         <option value="">All Branches</option>
-        {% for code, name in branch_choices %}<option value="{{ code }}" {% if branch_code == code %}selected{% endif %}>{{ code }} — {{ name }}</option>{% endfor %}
+        {% for code, name in branch_choices %}
+        <option value="{{ code }}" {% if branch_code == code %}selected{% endif %}>{{ code }} — {{ name }}</option>
+        {% endfor %}
       </select>
     </div>
     {% endif %}
-    <div class="col-md-3 text-end">
-      <button class="btn btn-outline-primary btn-sm w-100 fw-semibold">Filter</button>
+
+    <!-- Status Filter -->
+    <div class="col-6 col-md-3 col-lg-2">
+      <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+        <option value="">All Statuses</option>
+        <option value="green" {% if status_filter == 'green' %}selected{% endif %}>On Track</option>
+        <option value="yellow" {% if status_filter == 'yellow' %}selected{% endif %}>At Risk</option>
+        <option value="red" {% if status_filter == 'red' %}selected{% endif %}>Delayed</option>
+      </select>
+    </div>
+
+    <!-- Action & Reset -->
+    <div class="col-auto d-flex align-items-center gap-1">
+      <button type="submit" class="btn btn-primary btn-sm px-3 fw-semibold shadow-sm" style="background: var(--sp-navy, #0f2c59);">
+        <i class="bi bi-funnel me-1"></i> Filter
+      </button>
+      {% if q or branch_code or status_filter %}
+      <a href="{% url 'projects:list' %}" class="btn btn-outline-secondary btn-sm px-2" title="Reset Filters">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </a>
+      {% endif %}
+    </div>
+
+    <!-- View Switcher (Table vs Cards) -->
+    <div class="col-auto ms-auto d-flex align-items-center gap-1">
+      <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+        <button type="button" class="btn btn-outline-secondary btn-sm sp-view-btn active" id="viewBtnTable" onclick="spSetView('table')" title="Table View">
+          <i class="bi bi-table"></i>
+        </button>
+        <button type="button" class="btn btn-outline-secondary btn-sm sp-view-btn" id="viewBtnGrid" onclick="spSetView('grid')" title="Card Grid View">
+          <i class="bi bi-grid-fill"></i>
+        </button>
+      </div>
     </div>
   </form>
 
-  <div class="table-responsive">
-    <table class="table table-hover table-sm align-middle sp-inventory-table">
-      <thead>
+  <!-- 1. TABLE VIEW -->
+  <div class="table-responsive" id="tableViewContainer">
+    <table class="table table-hover table-sm align-middle mb-0">
+      <thead class="sp-project-table-head">
         <tr>
           <th>Project</th>
           <th>Branch</th>
-          <th>Leadership (GM / PM / PL)</th>
-          <th>Target</th>
-          <th>Delivered</th>
-          <th>Delivery %</th>
+          <th>Leadership Team</th>
+          <th class="text-end">Target</th>
+          <th class="text-end">Delivered</th>
+          <th style="min-width: 140px;">Delivery Progress</th>
           <th>Status</th>
-          <th class="text-end">Actions</th>
+          <th class="text-end" style="min-width: 120px;">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for p in projects %}
-        <tr>
-          <td>
-            <a href="{% url 'projects:detail' p.pk %}" class="fw-bold text-decoration-none text-navy fs-6">{{ p.project_name }}</a>
-          </td>
-          <td><span class="badge bg-secondary-subtle text-secondary-emphasis">{{ p.branch.code }}</span></td>
-          <td>
-            <div class="d-flex flex-column gap-1" style="font-size: 0.72rem;">
-              {% if p.gm_name %}<span><strong class="text-secondary">GM:</strong> {{ p.gm_name }}</span>{% endif %}
-              {% if p.pm_name %}<span><strong class="text-primary">PM:</strong> {{ p.pm_name }}</span>{% endif %}
-              {% if p.pl_name %}<span><strong class="text-warning">PL:</strong> {{ p.pl_name }}</span>{% endif %}
-              {% if not p.gm_name and not p.pm_name and not p.pl_name %}<span class="text-muted">&mdash;</span>{% endif %}
-            </div>
-          </td>
-          <td class="fw-semibold">{{ p.target_records|floatformat:0 }}</td>
-          <td class="fw-semibold text-success">{{ p.delivered_records|floatformat:0 }}</td>
+        <tr class="sp-project-row project-item" data-project-name="{{ p.project_name|lower }}" data-gm="{{ p.gm_name|lower }}" data-pm="{{ p.pm_name|lower }}">
           <td>
             <div class="d-flex align-items-center gap-2">
-              <div class="progress flex-grow-1" style="height: 6px; min-width: 60px;">
-                <div class="progress-bar bg-success" style="width: {{ p.delivery_percent }}%"></div>
+              <div class="sp-project-avatar" title="{{ p.project_name }}">
+                {{ p.project_name|slice:":2"|upper }}
               </div>
-              <span class="fw-semibold small">{{ p.delivery_percent }}%</span>
+              <div class="d-flex flex-column overflow-hidden">
+                <a href="{% url 'projects:detail' p.pk %}" class="fw-bold text-decoration-none text-navy fs-6 text-truncate" title="{{ p.project_name }}">
+                  {{ p.project_name }}
+                </a>
+                <div class="d-flex align-items-center gap-1 mt-1 text-muted small" style="font-size: 0.68rem;">
+                  {% if p.customer_name %}
+                  <span><i class="bi bi-building me-1"></i>{{ p.customer_name }}</span>
+                  {% endif %}
+                  {% if p.language %}
+                  <span class="badge bg-light text-secondary border px-1" style="font-size: 0.62rem;">{{ p.language }}</span>
+                  {% endif %}
+                  {% if p.google_sheet_url %}
+                  <span class="text-success" title="Connected to Google Sheet"><i class="bi bi-file-earmark-spreadsheet-fill"></i></span>
+                  {% endif %}
+                </div>
+              </div>
             </div>
           </td>
+
           <td>
-            <span class="status-dot status-{{ p.status }}"></span>
-            <span class="fw-semibold small text-capitalize">{{ p.status_label|default:p.status }}</span>
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-2 py-1" title="{{ p.branch.name }}">
+              {{ p.branch.code }}
+            </span>
           </td>
+
+          <td>
+            <div class="d-flex flex-column gap-1" style="font-size: 0.72rem;">
+              {% if p.gm_name %}
+              <span class="sp-lead-pill"><strong class="text-secondary">GM:</strong> {{ p.gm_name }}</span>
+              {% endif %}
+              {% if p.pm_name %}
+              <span class="sp-lead-pill"><strong class="text-primary">PM:</strong> {{ p.pm_name }}</span>
+              {% endif %}
+              {% if p.pl_name %}
+              <span class="sp-lead-pill"><strong class="text-warning">PL:</strong> {{ p.pl_name }}</span>
+              {% endif %}
+              {% if not p.gm_name and not p.pm_name and not p.pl_name %}
+              <span class="text-muted">&mdash;</span>
+              {% endif %}
+            </div>
+          </td>
+
+          <td class="text-end fw-semibold text-navy">
+            {{ p.target_records|intcomma }}
+          </td>
+
+          <td class="text-end fw-bold text-success">
+            {{ p.delivered_records|intcomma }}
+          </td>
+
+          <td>
+            <div class="d-flex align-items-center gap-2">
+              <div class="progress flex-grow-1" style="height: 6px; background: #e2e8f0; border-radius: 4px;">
+                <div class="progress-bar {% if p.delivery_percent >= 50 %}bg-success{% elif p.delivery_percent >= 25 %}bg-warning{% else %}bg-danger{% endif %}"
+                     style="width: {{ p.delivery_percent }}%"></div>
+              </div>
+              <span class="fw-bold small {% if p.delivery_percent >= 50 %}text-success{% elif p.delivery_percent >= 25 %}text-warning-emphasis{% else %}text-danger{% endif %}" style="font-size: 0.75rem; min-width: 44px; text-align: right;">
+                {{ p.delivery_percent }}%
+              </span>
+            </div>
+          </td>
+
+          <td>
+            {% if p.status == 'green' %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1">
+              <span class="status-dot status-green me-1"></span> On Track
+            </span>
+            {% elif p.status == 'yellow' %}
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill px-2 py-1">
+              <span class="status-dot status-yellow me-1"></span> At Risk
+            </span>
+            {% elif p.status == 'red' %}
+            <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle rounded-pill px-2 py-1">
+              <span class="status-dot status-red me-1"></span> Delayed
+            </span>
+            {% else %}
+            <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle rounded-pill px-2 py-1">
+              {{ p.status_label|default:p.status|title }}
+            </span>
+            {% endif %}
+          </td>
+
           <td class="text-end">
             <div class="btn-group btn-group-sm">
-              <a href="{% url 'projects:insights' p.pk %}" class="btn btn-outline-primary py-0 px-2" title="Project Insights"><i class="bi bi-graph-up-arrow small"></i></a>
+              <a href="{% url 'projects:insights' p.pk %}" class="btn btn-outline-primary py-1 px-2" title="Project Analytics &amp; Insights">
+                <i class="bi bi-graph-up-arrow"></i>
+              </a>
               {% if user.profile.can_edit_projects %}
-              <a href="{% url 'projects:edit' p.pk %}" class="btn btn-outline-secondary py-0 px-2" title="Edit Project"><i class="bi bi-pencil small"></i></a>
+              <a href="{% url 'projects:edit' p.pk %}" class="btn btn-outline-secondary py-1 px-2" title="Edit Project">
+                <i class="bi bi-pencil"></i>
+              </a>
               {% endif %}
               {% if user.profile.can_delete_projects %}
-              <a href="{% url 'projects:delete' p.pk %}" class="btn btn-outline-danger py-0 px-2" title="Delete Project"><i class="bi bi-trash small"></i></a>
+              <a href="{% url 'projects:delete' p.pk %}" class="btn btn-outline-danger py-1 px-2" title="Delete Project">
+                <i class="bi bi-trash"></i>
+              </a>
               {% endif %}
             </div>
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="8" class="text-muted text-center py-4">No projects found.</td></tr>
+        <tr>
+          <td colspan="8" class="text-muted text-center py-5">
+            <div class="d-flex flex-column align-items-center gap-2">
+              <i class="bi bi-folder-x fs-1 text-secondary"></i>
+              <span class="fw-semibold fs-6">No matching projects found</span>
+              <span class="small text-muted">Try adjusting your filters or search terms</span>
+            </div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  <!-- 2. CARD GRID VIEW (Initially hidden or shown via JS switcher) -->
+  <div class="row g-3 d-none" id="gridViewContainer">
+    {% for p in projects %}
+    <div class="col-md-6 col-xl-4 project-item" data-project-name="{{ p.project_name|lower }}" data-gm="{{ p.gm_name|lower }}" data-pm="{{ p.pm_name|lower }}">
+      <div class="sp-directory-card p-3 shadow-sm h-100 d-flex flex-column justify-content-between">
+        <div>
+          <!-- Card Header -->
+          <div class="d-flex align-items-center justify-content-between gap-2 mb-2 pb-2 border-bottom">
+            <div class="d-flex align-items-center gap-2 overflow-hidden">
+              <div class="sp-project-avatar" title="{{ p.project_name }}">
+                {{ p.project_name|slice:":2"|upper }}
+              </div>
+              <div class="overflow-hidden">
+                <a href="{% url 'projects:detail' p.pk %}" class="fw-bold text-decoration-none text-navy text-truncate d-block small" title="{{ p.project_name }}">
+                  {{ p.project_name }}
+                </a>
+                <span class="badge bg-secondary-subtle text-secondary border px-1" style="font-size: 0.65rem;">
+                  {{ p.branch.code }} &bull; {{ p.branch.name }}
+                </span>
+              </div>
+            </div>
+            <div>
+              {% if p.status == 'green' %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill" style="font-size: 0.65rem;">On Track</span>
+              {% elif p.status == 'yellow' %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle rounded-pill" style="font-size: 0.65rem;">At Risk</span>
+              {% else %}
+              <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle rounded-pill" style="font-size: 0.65rem;">Delayed</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Progress -->
+          <div class="my-2">
+            <div class="d-flex align-items-center justify-content-between mb-1 small">
+              <span class="text-muted fw-semibold" style="font-size: 0.72rem;">Delivery Progress</span>
+              <span class="fw-bold {% if p.delivery_percent >= 50 %}text-success{% elif p.delivery_percent >= 25 %}text-warning-emphasis{% else %}text-danger{% endif %}" style="font-size: 0.75rem;">
+                {{ p.delivery_percent }}%
+              </span>
+            </div>
+            <div class="progress" style="height: 6px; background: #e2e8f0; border-radius: 4px;">
+              <div class="progress-bar {% if p.delivery_percent >= 50 %}bg-success{% elif p.delivery_percent >= 25 %}bg-warning{% else %}bg-danger{% endif %}"
+                   style="width: {{ p.delivery_percent }}%"></div>
+            </div>
+          </div>
+
+          <!-- Volume Stats Grid -->
+          <div class="row g-2 my-2 py-2 bg-light rounded text-center">
+            <div class="col-6 border-end">
+              <div class="text-muted text-uppercase" style="font-size: 0.62rem; font-weight: 600;">Target</div>
+              <div class="fw-bold text-navy small">{{ p.target_records|intcomma }}</div>
+            </div>
+            <div class="col-6">
+              <div class="text-muted text-uppercase" style="font-size: 0.62rem; font-weight: 600;">Delivered</div>
+              <div class="fw-bold text-success small">{{ p.delivered_records|intcomma }}</div>
+            </div>
+          </div>
+
+          <!-- Leadership Pills -->
+          <div class="d-flex flex-wrap gap-1 mt-2 mb-3" style="font-size: 0.68rem;">
+            {% if p.gm_name %}<span class="sp-lead-pill"><strong class="text-secondary">GM:</strong> {{ p.gm_name }}</span>{% endif %}
+            {% if p.pm_name %}<span class="sp-lead-pill"><strong class="text-primary">PM:</strong> {{ p.pm_name }}</span>{% endif %}
+            {% if p.pl_name %}<span class="sp-lead-pill"><strong class="text-warning">PL:</strong> {{ p.pl_name }}</span>{% endif %}
+          </div>
+        </div>
+
+        <!-- Card Footer Actions -->
+        <div class="d-flex align-items-center justify-content-between pt-2 border-top gap-1 mt-auto">
+          <a href="{% url 'projects:detail' p.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 flex-grow-1 text-center" style="font-size: 0.72rem;">
+            <i class="bi bi-arrow-right me-1"></i> View Details
+          </a>
+          <a href="{% url 'projects:insights' p.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" title="Analytics">
+            <i class="bi bi-graph-up-arrow"></i>
+          </a>
+          {% if user.profile.can_edit_projects %}
+          <a href="{% url 'projects:edit' p.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1" title="Edit">
+            <i class="bi bi-pencil"></i>
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5 text-muted">
+      <i class="bi bi-folder-x fs-1 d-block mb-2 text-secondary"></i>
+      No projects found.
+    </div>
+    {% endfor %}
+  </div>
 </div>
+
+<script>
+function spSetView(mode) {
+  var tableContainer = document.getElementById("tableViewContainer");
+  var gridContainer = document.getElementById("gridViewContainer");
+  var btnTable = document.getElementById("viewBtnTable");
+  var btnGrid = document.getElementById("viewBtnGrid");
+
+  if (mode === "grid") {
+    if (tableContainer) tableContainer.classList.add("d-none");
+    if (gridContainer) gridContainer.classList.remove("d-none");
+    if (btnTable) btnTable.classList.remove("active");
+    if (btnGrid) btnGrid.classList.add("active");
+    try { localStorage.setItem("spProjectViewPref", "grid"); } catch(e){}
+  } else {
+    if (tableContainer) tableContainer.classList.remove("d-none");
+    if (gridContainer) gridContainer.classList.add("d-none");
+    if (btnTable) btnTable.classList.add("active");
+    if (btnGrid) btnGrid.classList.remove("active");
+    try { localStorage.setItem("spProjectViewPref", "table"); } catch(e){}
+  }
+}
+
+function spLiveFilterProjects() {
+  var q = document.getElementById("projectSearchInput").value.toLowerCase().trim();
+  var items = document.querySelectorAll(".project-item");
+
+  items.forEach(function(el) {
+    var name = el.getAttribute("data-project-name") || "";
+    var gm = el.getAttribute("data-gm") || "";
+    var pm = el.getAttribute("data-pm") || "";
+    if (!q || name.indexOf(q) !== -1 || gm.indexOf(q) !== -1 || pm.indexOf(q) !== -1) {
+      el.style.display = "";
+    } else {
+      el.style.display = "none";
+    }
+  });
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  try {
+    var pref = localStorage.getItem("spProjectViewPref");
+    if (pref === "grid") {
+      spSetView("grid");
+    }
+  } catch(e){}
+});
+</script>
 {% endblock %}

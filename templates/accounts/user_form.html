@@ -1,57 +1,433 @@
 {% extends "base/base.html" %}
 {% block content %}
-<h4 class="fw-bold mb-3" style="color: var(--sp-navy)">{% if mode == "edit" %}Edit User — {{ target.username }}{% else %}New User{% endif %}</h4>
-<div class="sp-panel" style="max-width: 480px">
-  <form method="post">
-    {% csrf_token %}
-    {% if mode != "edit" %}
-    <div class="mb-3"><label class="form-label">Username</label><input name="username" class="form-control" required></div>
+<div class="d-flex align-items-center justify-content-between w-100 flex-wrap gap-2 mb-3">
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'accounts:user_list' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 shadow-sm" title="Back to User List">
+      <i class="bi bi-arrow-left me-1"></i> Back
+    </a>
+    <h4 class="fw-bold mb-0 text-navy">
+      <i class="bi bi-person-gear me-2 text-primary"></i>
+      {% if mode == "edit" %}Edit User: <span class="text-primary">{{ target.username }}</span>{% else %}Create New User{% endif %}
+    </h4>
+  </div>
+  {% if mode == "edit" %}
+  <div>
+    {% if target.profile.role == 'ADMIN' %}
+      <span class="badge bg-danger-subtle text-danger-emphasis border border-danger-subtle px-3 py-2 fs-6 rounded-pill"><i class="bi bi-shield-lock me-1"></i> Administrator</span>
+    {% elif target.profile.role == 'MANAGER' %}
+      <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle px-3 py-2 fs-6 rounded-pill"><i class="bi bi-briefcase me-1"></i> General Manager</span>
+    {% elif target.profile.role == 'PM' %}
+      <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle px-3 py-2 fs-6 rounded-pill"><i class="bi bi-kanban me-1"></i> Project Manager</span>
+    {% elif target.profile.role == 'PL' %}
+      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-3 py-2 fs-6 rounded-pill"><i class="bi bi-person-badge me-1"></i> Project Lead</span>
+    {% else %}
+      <span class="badge bg-secondary-subtle text-secondary-emphasis border border-secondary-subtle px-3 py-2 fs-6 rounded-pill"><i class="bi bi-eye me-1"></i> Viewer</span>
     {% endif %}
-    <div class="mb-3">
-      <label class="form-label">{% if mode == "edit" %}New Password (leave blank to keep current){% else %}Password{% endif %}</label>
-      <input type="password" name="password" class="form-control" {% if mode != "edit" %}required{% endif %}>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Role</label>
-      <select name="role" class="form-select">
-        {% for value, label in role_choices %}
-          <option value="{{ value }}" {% if target.profile.role == value %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Branch Access</label>
-      <div class="form-text mb-2">Administrators always have full access to every branch regardless of what's
-        checked here. For General Manager / Viewer, check every branch this person should be able to see and act on —
-        leave all unchecked to grant no access yet.</div>
-      {% for b in branches %}
-      <div class="form-check">
-        <input type="checkbox" name="branches" value="{{ b.pk }}" class="form-check-input" id="branch{{ b.pk }}"
-               {% if b.pk in assigned_branch_ids %}checked{% endif %}>
-        <label class="form-check-label" for="branch{{ b.pk }}">{{ b.code }} - {{ b.name }}</label>
-      </div>
-      {% endfor %}
-    </div>
-    <div class="mb-3">
-      <label class="form-label">Project Access <span class="text-muted fw-normal">(Project Manager &amp; Viewer only)</span></label>
-      <div class="form-text mb-2">Only enforced for the <strong>Project Manager</strong> and <strong>Viewer</strong> roles - they'll
-        see/act on exactly the projects checked here (still limited to their checked branches above). Ignored for
-        Administrator / General Manager / Project Lead, who go by Branch Access alone. Leave unchecked for a new
-        Project Manager/Viewer to grant no project access yet.</div>
-      <div class="sp-checklist-scroll">
-        {% for p in projects %}
-        <div class="form-check">
-          <input type="checkbox" name="projects" value="{{ p.pk }}" class="form-check-input" id="project{{ p.pk }}"
-                 {% if p.pk in assigned_project_ids %}checked{% endif %}>
-          <label class="form-check-label" for="project{{ p.pk }}">{{ p.branch.code }} — {{ p.project_name }}</label>
-        </div>
-        {% empty %}
-        <div class="text-muted small">No projects exist yet.</div>
-        {% endfor %}
-      </div>
-    </div>
-    <button class="btn text-white" style="background: var(--sp-navy)">{% if mode == "edit" %}Save Changes{% else %}Create User{% endif %}</button>
-    <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
-  </form>
+  </div>
+  {% endif %}
 </div>
+
+<form method="post" id="userForm">
+  {% csrf_token %}
+  <div class="row g-3">
+    <!-- Left Column: User Credentials & Role Info -->
+    <div class="col-xl-4 col-lg-5">
+      <div class="sp-panel mb-3 shadow-sm">
+        <h6 class="fw-bold mb-3 text-navy d-flex align-items-center gap-2">
+          <i class="bi bi-person-badge-fill text-primary"></i> User Account Details
+        </h6>
+
+        {% if mode != "edit" %}
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted">Username <span class="text-danger">*</span></label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-light"><i class="bi bi-person text-muted"></i></span>
+            <input type="text" name="username" class="form-control" placeholder="Enter unique username" required autofocus>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted">
+            {% if mode == "edit" %}New Password <span class="fw-normal text-muted">(leave blank to keep current)</span>{% else %}Password <span class="text-danger">*</span>{% endif %}
+          </label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-light"><i class="bi bi-key text-muted"></i></span>
+            <input type="password" name="password" id="passwordInput" class="form-control" placeholder="{% if mode == 'edit' %}Type new password to change...{% else %}Enter secure password...{% endif %}" {% if mode != "edit" %}required{% endif %} autocomplete="new-password">
+            <button class="btn btn-outline-secondary" type="button" id="spTogglePasswordBtn" title="Show password" onclick="window.spTogglePassword(event)">
+              <i class="bi bi-eye text-muted" id="passwordEyeIcon" style="pointer-events: none;"></i>
+            </button>
+          </div>
+          <div class="form-text small text-muted mt-1">
+            <i class="bi bi-shield-lock me-1"></i>
+            {% if mode == 'edit' %}
+            Existing passwords are encrypted. Type a new password above to change it, or leave blank to keep current.
+            {% else %}
+            Type a password and click the eye button to view or hide it.
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold small text-muted">Role <span class="text-danger">*</span></label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text bg-light"><i class="bi bi-shield-check text-muted"></i></span>
+            <select name="role" id="roleSelect" class="form-select fw-semibold" onchange="spUpdateRoleInfo()">
+              {% for value, label in role_choices %}
+                <option value="{{ value }}" {% if target.profile.role == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Dynamic Role Description Card -->
+        <div id="roleInfoCard" class="sp-role-card role-manager mt-3">
+          <div class="d-flex align-items-center gap-2 mb-1">
+            <i id="roleIcon" class="bi bi-shield-check text-primary fs-5"></i>
+            <span id="roleTitle" class="fw-bold text-navy">General Manager</span>
+          </div>
+          <p id="roleDescription" class="text-muted small mb-0">
+            Operations &amp; template management for allocated projects and branches.
+          </p>
+        </div>
+      </div>
+
+      <!-- Quick Action Submission Box -->
+      <div class="sp-panel shadow-sm text-center">
+        <div class="d-flex flex-column gap-2">
+          <button type="submit" class="btn text-white py-2 fw-semibold shadow-sm w-100" style="background: var(--sp-navy, #0f2c59);">
+            <i class="bi bi-check-circle-fill me-1"></i> {% if mode == "edit" %}Save User Access Changes{% else %}Create User Account{% endif %}
+          </button>
+          <a href="{% url 'accounts:user_list' %}" class="btn btn-outline-secondary btn-sm py-2">
+            Cancel
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Branch & Project Allocation Grids -->
+    <div class="col-xl-8 col-lg-7">
+      <!-- 1. Branch Allocation Card -->
+      <div class="sp-panel mb-3 shadow-sm">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+          <div>
+            <h6 class="fw-bold mb-0 text-navy d-flex align-items-center gap-2">
+              <i class="bi bi-diagram-2-fill text-primary"></i> 1. Branch Access Allocation
+            </h6>
+            <span class="text-muted small">Choose the branches this user is authorized to access.</span>
+          </div>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" onclick="spSelectAllBranches(true)">Select All</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="spSelectAllBranches(false)">Clear All</button>
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1" id="branchesGrid">
+          {% for b in branches %}
+          <div class="col-sm-6 col-md-4">
+            <label class="sp-branch-card w-100 h-100 mb-0" for="branch_{{ b.pk }}">
+              <input type="checkbox" name="branches" value="{{ b.pk }}" class="form-check-input branch-checkbox" id="branch_{{ b.pk }}"
+                     data-branch-id="{{ b.pk }}" data-branch-code="{{ b.code }}"
+                     {% if b.pk in assigned_branch_ids %}checked{% endif %}
+                     onchange="spOnBranchChanged(this)">
+              <div class="d-flex flex-column overflow-hidden">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="sp-branch-pill">{{ b.code }}</span>
+                  <span class="fw-semibold text-navy text-truncate small">{{ b.name }}</span>
+                </div>
+              </div>
+            </label>
+          </div>
+          {% empty %}
+          <div class="col-12 text-muted small py-2">No branches configured.</div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- 2. Project Allocation Card -->
+      <div class="sp-panel shadow-sm">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2 pb-2 border-bottom">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <h6 class="fw-bold mb-0 text-navy d-flex align-items-center gap-2">
+                <i class="bi bi-kanban-fill text-primary"></i> 2. Project Access Allocation
+              </h6>
+              <span id="selectedCountBadge" class="badge bg-primary rounded-pill px-2">0 Selected</span>
+            </div>
+            <span class="text-muted small">Whichever projects you check below will be strictly the only projects visible to this user.</span>
+          </div>
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-outline-primary btn-sm py-1 px-2" onclick="spSelectProjectsForCheckedBranches()">
+              <i class="bi bi-check-all me-1"></i> Select For Checked Branches
+            </button>
+            <button type="button" class="btn btn-outline-secondary btn-sm py-1 px-2" onclick="spSelectAllProjects(false)">
+              Clear Projects
+            </button>
+          </div>
+        </div>
+
+        <!-- Project Filter / Search Bar -->
+        <div class="row g-2 align-items-center mb-3">
+          <div class="col-md-7">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text bg-white text-muted"><i class="bi bi-search"></i></span>
+              <input type="text" id="projectSearchInput" class="form-control" placeholder="Search project name, branch, code..." onkeyup="spFilterProjects()">
+              <button class="btn btn-outline-secondary" type="button" onclick="spClearProjectSearch()" title="Clear Search">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="col-md-5 d-flex align-items-center justify-content-md-end gap-2 text-muted small">
+            <span id="projectsVisibleCount">{{ projects|length }} total projects</span>
+          </div>
+        </div>
+
+        <!-- Grouped Projects List -->
+        <div class="sp-projects-container" id="projectsListContainer">
+          {% regroup projects by branch as branch_grouped_projects %}
+          {% for group in branch_grouped_projects %}
+          <div class="project-branch-group mb-3" data-branch-id="{{ group.grouper.pk }}" data-branch-code="{{ group.grouper.code|lower }}">
+            <div class="d-flex align-items-center justify-content-between px-2 py-1 mb-2 bg-light rounded border">
+              <span class="fw-bold text-navy small">
+                <i class="bi bi-building me-1 text-primary"></i> {{ group.grouper.code }} — {{ group.grouper.name }}
+              </span>
+              <button type="button" class="btn btn-link btn-sm text-decoration-none py-0 px-1 small" onclick="spToggleGroupProjects('{{ group.grouper.pk }}')">
+                Select Branch Group
+              </button>
+            </div>
+            <div class="row g-2 px-1">
+              {% for p in group.list %}
+              <div class="col-md-6 project-item-wrapper"
+                   data-project-id="{{ p.pk }}"
+                   data-branch-id="{{ p.branch.pk }}"
+                   data-project-name="{{ p.project_name|lower }}"
+                   data-branch-code="{{ p.branch.code|lower }}">
+                <label class="sp-project-card w-100 h-100 mb-0" for="project_{{ p.pk }}">
+                  <input type="checkbox" name="projects" value="{{ p.pk }}" class="form-check-input project-checkbox" id="project_{{ p.pk }}"
+                         data-branch-id="{{ p.branch.pk }}"
+                         {% if p.pk in assigned_project_ids %}checked{% endif %}
+                         onchange="spUpdateSelectedCount()">
+                  <div class="d-flex flex-column overflow-hidden flex-grow-1">
+                    <span class="fw-semibold text-navy small text-truncate" title="{{ p.project_name }}">{{ p.project_name }}</span>
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                      <span class="badge bg-light text-muted border" style="font-size: 0.65rem;">{{ p.branch.code }}</span>
+                      {% if p.language %}
+                      <span class="badge bg-light text-secondary border" style="font-size: 0.65rem;">{{ p.language }}</span>
+                      {% endif %}
+                      <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 0.65rem;">Active</span>
+                    </div>
+                  </div>
+                </label>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% empty %}
+          <div class="text-center py-4 text-muted">
+            <i class="bi bi-folder-x fs-2 d-block mb-2 text-secondary"></i>
+            No projects available yet. Create or import projects first.
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<script>
+window.spTogglePassword = function(e) {
+  if (e) {
+    if (e.preventDefault) e.preventDefault();
+    if (e.stopPropagation) e.stopPropagation();
+  }
+  var inp = document.getElementById("passwordInput");
+  var icon = document.getElementById("passwordEyeIcon");
+  var btn = document.getElementById("spTogglePasswordBtn");
+  if (!inp) return;
+
+  if (inp.type === "password") {
+    inp.type = "text";
+    if (icon) {
+      icon.className = "bi bi-eye-slash-fill text-primary";
+    }
+    if (btn) {
+      btn.title = "Hide password";
+      btn.classList.add("btn-light");
+    }
+  } else {
+    inp.type = "password";
+    if (icon) {
+      icon.className = "bi bi-eye text-muted";
+    }
+    if (btn) {
+      btn.title = "Show password";
+      btn.classList.remove("btn-light");
+    }
+  }
+  inp.focus();
+};
+
+var roleMetadata = {
+  "ADMIN": {
+    title: "Administrator",
+    icon: "bi-shield-lock-fill text-danger",
+    cardClass: "sp-role-card role-admin",
+    desc: "Unrestricted global access. Has full visibility and authority across all branches, projects, and system settings."
+  },
+  "MANAGER": {
+    title: "General Manager",
+    icon: "bi-briefcase-fill text-primary",
+    cardClass: "sp-role-card role-manager",
+    desc: "Management access restricted strictly to allocated branches and allocated projects."
+  },
+  "PM": {
+    title: "Project Manager",
+    icon: "bi-kanban-fill text-info",
+    cardClass: "sp-role-card role-pm",
+    desc: "Project delivery & management restricted strictly to assigned projects within assigned branches."
+  },
+  "PL": {
+    title: "Project Lead",
+    icon: "bi-person-badge-fill text-warning",
+    cardClass: "sp-role-card role-pl",
+    desc: "Operational monitoring and metric updates restricted strictly to assigned projects within assigned branches."
+  },
+  "VIEWER": {
+    title: "Viewer",
+    icon: "bi-eye-fill text-secondary",
+    cardClass: "sp-role-card role-viewer",
+    desc: "Read-only access restricted strictly to assigned projects and branches."
+  }
+};
+
+function spUpdateRoleInfo() {
+  var sel = document.getElementById("roleSelect");
+  var card = document.getElementById("roleInfoCard");
+  var title = document.getElementById("roleTitle");
+  var desc = document.getElementById("roleDescription");
+  var icon = document.getElementById("roleIcon");
+  if (!sel || !card) return;
+
+  var role = sel.value;
+  var meta = roleMetadata[role] || roleMetadata["VIEWER"];
+  card.className = meta.cardClass + " mt-3";
+  title.innerText = meta.title;
+  desc.innerText = meta.desc;
+  icon.className = "bi " + meta.icon + " fs-5";
+}
+
+function spSelectAllBranches(checked) {
+  var boxes = document.querySelectorAll(".branch-checkbox");
+  boxes.forEach(function(cb) {
+    cb.checked = checked;
+  });
+  spUpdateProjectBranchStyles();
+}
+
+function spOnBranchChanged(input) {
+  spUpdateProjectBranchStyles();
+}
+
+function spUpdateProjectBranchStyles() {
+  var checkedBranchIds = new Set();
+  document.querySelectorAll(".branch-checkbox:checked").forEach(function(cb) {
+    checkedBranchIds.add(cb.getAttribute("data-branch-id"));
+  });
+
+  // Highlight/dim project groups
+  document.querySelectorAll(".project-branch-group").forEach(function(group) {
+    var bId = group.getAttribute("data-branch-id");
+    if (checkedBranchIds.size === 0 || checkedBranchIds.has(bId)) {
+      group.style.opacity = "1";
+    } else {
+      group.style.opacity = "0.6";
+    }
+  });
+}
+
+function spSelectProjectsForCheckedBranches() {
+  var checkedBranchIds = new Set();
+  document.querySelectorAll(".branch-checkbox:checked").forEach(function(cb) {
+    checkedBranchIds.add(cb.getAttribute("data-branch-id"));
+  });
+
+  document.querySelectorAll(".project-checkbox").forEach(function(cb) {
+    var bId = cb.getAttribute("data-branch-id");
+    if (checkedBranchIds.has(bId)) {
+      cb.checked = true;
+    }
+  });
+  spUpdateSelectedCount();
+}
+
+function spSelectAllProjects(checked) {
+  document.querySelectorAll(".project-checkbox").forEach(function(cb) {
+    cb.checked = checked;
+  });
+  spUpdateSelectedCount();
+}
+
+function spToggleGroupProjects(branchId) {
+  var group = document.querySelector('.project-branch-group[data-branch-id="' + branchId + '"]');
+  if (!group) return;
+  var boxes = group.querySelectorAll(".project-checkbox");
+  var allChecked = Array.from(boxes).every(function(b) { return b.checked; });
+  boxes.forEach(function(b) { b.checked = !allChecked; });
+  spUpdateSelectedCount();
+}
+
+function spFilterProjects() {
+  var q = document.getElementById("projectSearchInput").value.toLowerCase().trim();
+  var items = document.querySelectorAll(".project-item-wrapper");
+  var visibleCount = 0;
+
+  items.forEach(function(item) {
+    var pName = item.getAttribute("data-project-name") || "";
+    var bCode = item.getAttribute("data-branch-code") || "";
+    if (!q || pName.indexOf(q) !== -1 || bCode.indexOf(q) !== -1) {
+      item.style.display = "";
+      visibleCount++;
+    } else {
+      item.style.display = "none";
+    }
+  });
+
+  // Check empty groups
+  document.querySelectorAll(".project-branch-group").forEach(function(group) {
+    var visibleItemsInGroup = group.querySelectorAll('.project-item-wrapper:not([style*="display: none"])');
+    group.style.display = visibleItemsInGroup.length > 0 ? "" : "none";
+  });
+
+  var countSpan = document.getElementById("projectsVisibleCount");
+  if (countSpan) {
+    countSpan.innerText = visibleCount + " projects visible";
+  }
+}
+
+function spClearProjectSearch() {
+  var inp = document.getElementById("projectSearchInput");
+  if (inp) inp.value = "";
+  spFilterProjects();
+}
+
+function spUpdateSelectedCount() {
+  var count = document.querySelectorAll(".project-checkbox:checked").length;
+  var badge = document.getElementById("selectedCountBadge");
+  if (badge) {
+    badge.innerText = count + " Selected";
+  }
+}
+
+// Initialize on page load
+document.addEventListener("DOMContentLoaded", function() {
+  spUpdateRoleInfo();
+  spUpdateSelectedCount();
+  spUpdateProjectBranchStyles();
+
+  var toggleBtn = document.getElementById("spTogglePasswordBtn");
+  if (toggleBtn) {
+    toggleBtn.addEventListener("click", window.spTogglePassword);
+  }
+});
+</script>
 {% endblock %}

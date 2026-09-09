@@ -34,7 +34,7 @@ def logout_view(request):
 
 @role_required(UserProfile.ROLE_ADMIN)
 def user_list(request):
-    users = User.objects.select_related("profile").prefetch_related("profile__branches").all()
+    users = User.objects.select_related("profile").prefetch_related("profile__branches", "profile__projects").all()
     return render(request, "accounts/user_list.html", {"users": users})
 
 

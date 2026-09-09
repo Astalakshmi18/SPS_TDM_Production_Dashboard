@@ -7,12 +7,8 @@ from apps.accounts.models import UserProfile
 from .models import Branch
 
 
-@login_required
+@role_required(UserProfile.ROLE_ADMIN)
 def branch_list(request):
-    # Was Branch.objects.all() for every logged-in user regardless of role -
-    # a Viewer/Manager/PL/PM scoped to one branch could still see every
-    # other branch in this list (just not act on them). accessible_branches()
-    # gives ADMIN everything and everyone else only what's been granted.
     branches = accessible_branches(request)
     return render(request, "branches/list.html", {"branches": branches})
 

@@ -385,6 +385,63 @@ class Project(models.Model):
             "weekly_label": weekly_label,
         }
 
+    def get_total_inventory_data(self):
+        """Returns the Total Count / Sum of Branch Receipt column from Inventory sheet
+        (e.g. S Column Total Count for BPW: 877,515).
+        Prefers snapshot totals, then extracts dynamically from project's source workbook,
+        then falls back to database daily metrics sum or delivered/target records.
+        """
+        snap = self.operational_snapshot or {}
+        totals = snap.get("daily_metrics_totals") or {}
+        if totals.get("branch_receipt") is not None and float(totals["branch_receipt"]) > 0:
+            return float(totals["branch_receipt"])
+        if snap.get("total_branch_receipt") is not None and float(snap["total_branch_receipt"]) > 0:
+            return float(snap["total_branch_receipt"])
+
+        # Try extracting dynamically from latest uploaded file if branch_receipt is mapped
+        latest_batch = self.import_batches.filter(status="SUCCESS").order_by("-created_at").first()
+        if latest_batch and latest_batch.file_name:
+            try:
+                import os
+                import pandas as pd
+                from django.conf import settings
+                from apps.mapping.models import ProjectTemplate
+                from apps.mapping.engine import _SheetCache, _resolve_column
+
+                template = ProjectTemplate.objects.filter(project_key=self.project_key).first()
+                dm = (template.config.get("daily_metrics") or {}).get("branch_receipt") if template and template.config else None
+                if dm and dm.get("sheet") and dm.get("value_column"):
+                    file_path = os.path.join(settings.MEDIA_ROOT, latest_batch.file_name)
+                    if not os.path.exists(file_path):
+                        file_path = os.path.join(settings.MEDIA_ROOT, "uploads", os.path.basename(latest_batch.file_name))
+                    if os.path.exists(file_path):
+                        cache = _SheetCache(file_path)
+                        df = cache.get(dm["sheet"], dm.get("header_row", 1))
+                        vm = _resolve_column(df, dm["value_column"])
+                        if vm:
+                            fc = df.columns[0]
+                            df_clean = df[df[fc].notna()] if fc != vm else df
+                            s = pd.to_numeric(
+                                df_clean[vm].astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False),
+                                errors="coerce"
+                            ).fillna(0).sum()
+                            if s > 0:
+                                return float(s)
+            except Exception:
+                pass
+
+        # Fallback to database daily metrics sum
+        db_sum = self.daily_operational_metrics.filter(metric_key="branch_receipt").aggregate(total=Sum("value"))["total"]
+        if db_sum and float(db_sum) > 0:
+            return float(db_sum)
+
+        # Fallback to closed cycles target_achieved sum
+        closed_sum = sum(float(sc["target_achieved"]) for sc in (snap.get("monthly_cycles") or []) if sc.get("target_achieved"))
+        if closed_sum > 0:
+            return float(closed_sum)
+
+        return float(self.delivered_records or self.target_records or 0.0)
+
     def operational_panel(self):
         """Project-Level Operational Dashboard row (ops-review request):
         Daily Branch Receipt / Daily RQC Completed / RQC Quality Score come
@@ -517,12 +574,44 @@ class Project(models.Model):
         working_days = curr_month_working_days
         target_achieved = 0.0
 
+        # Overall Throughput per user formula:
+        # Current Throughput = Total Inventory Data (e.g. S Column Total Count) / (Branch Manpower * Timeline Total Working Days)
+        # Quoted Throughput IS Expected Throughput
+        total_inv_data = self.get_total_inventory_data()
+
+        branch_mp = (
+            curr_mp_info.get("headcount_branch")
+            or snap.get("headcount_branch")
+            or snap.get("manpower_used")
+            or self.branch_manpower_count
+            or 1
+        )
+        timeline_days = self.working_days_total or 1
+
+        if total_inv_data > 0 and branch_mp > 0 and timeline_days > 0:
+            overall_current_throughput = round(float(total_inv_data) / (float(branch_mp) * float(timeline_days)), 2)
+        else:
+            # Fallback for projects without inventory count
+            curr_mp = curr_manpower or branch_mp or 1
+            curr_wd = curr_month_working_days or timeline_days or 1
+            inv_fallback = branch_receipt if (branch_receipt and branch_receipt > 0) else (plan.get("monthly_actual") or 0.0)
+            if curr_mp and curr_wd and inv_fallback:
+                overall_current_throughput = round(float(inv_fallback) / (float(curr_mp) * float(curr_wd)), 2)
+            else:
+                overall_current_throughput = 0.0
+
         expected_throughput = float(quoted_throughput) if quoted_throughput is not None else 0.0
-        current_throughput = 0.0
-        target_achieved_status = None
-        target_achieved_label = "—"
-        throughput_gap = None
-        throughput_gap_pct = None
+        current_throughput = overall_current_throughput
+        if expected_throughput and expected_throughput > 0:
+            target_achieved_status = bool(current_throughput >= expected_throughput)
+            target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
+            throughput_gap = round(current_throughput - expected_throughput, 2)
+            throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2)
+        else:
+            target_achieved_status = None
+            target_achieved_label = "—"
+            throughput_gap = None
+            throughput_gap_pct = 0.0
 
         headcount_branch = (
             curr_mp_info.get("headcount_branch")
@@ -687,20 +776,21 @@ class Project(models.Model):
             else:
                 m_wd = get_month_working_days(cy_y, cy_m)
 
-            # User formula:
-            # Current Throughput = Inventory data / Branch Manpower / No. of Working Days
+            # Individual month throughput
             if is_current_cycle:
                 inv_data = receipts_sum if receipts_sum > 0 else (actual_sum or 0.0)
             else:
                 inv_data = m_info.get("target_achieved") if m_info.get("target_achieved") is not None else (actual_sum or receipts_sum or 0.0)
 
             if m_mp and m_wd and inv_data:
-                curr_tp = round(float(inv_data) / (float(m_mp) * float(m_wd)), 2)
+                month_tp = round(float(inv_data) / (float(m_mp) * float(m_wd)), 2)
             else:
-                curr_tp = 0.0
+                month_tp = 0.0
 
             # User formula: Expected Throughput = Quoted Throughput
+            # Current Throughput = Overall Throughput across the project
             exp_tp = float(quoted_throughput) if quoted_throughput is not None else 0.0
+            curr_tp = overall_current_throughput
 
             if exp_tp and exp_tp > 0:
                 tp_stat = bool(curr_tp >= exp_tp)
@@ -711,7 +801,7 @@ class Project(models.Model):
                 tp_lbl = "—"
                 tp_gp = None
 
-            return exp_tp, curr_tp, tp_gp, tp_stat, tp_lbl, m_wd, m_mp
+            return exp_tp, curr_tp, tp_gp, tp_stat, tp_lbl, m_wd, m_mp, month_tp
 
         for idx, dt in enumerate(delivery_totals):
             m_start = dt.month_start
@@ -730,7 +820,7 @@ class Project(models.Model):
             c_rqc_total = mdm.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(m_key, dt.month_label or m_key)
 
-            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp, c_month_tp = _calc_throughput_metrics(
                 m_key, dt.month_label, c_receipts_total, cp["monthly_actual"], is_current_cycle=is_curr
             )
             m_info = monthly_mp_map.get(m_key) or {}
@@ -758,6 +848,7 @@ class Project(models.Model):
                 "weekly_achieved": cp["weekly_achieved"],
                 "expected_throughput": c_exp_tp,
                 "current_throughput": c_curr_tp,
+                "month_throughput": c_month_tp,
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
@@ -784,7 +875,7 @@ class Project(models.Model):
             c_rqc_total = mdm.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(m_key, sc.get("month_label") or m_key)
 
-            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp, c_month_tp = _calc_throughput_metrics(
                 m_key, sc.get("month_label"), c_receipts_total, sc_cp["monthly_actual"] or sc.get("target_achieved"), is_current_cycle=is_curr
             )
             m_info = monthly_mp_map.get(m_key) or {}
@@ -812,6 +903,7 @@ class Project(models.Model):
                 "weekly_achieved": sc_cp["weekly_achieved"],
                 "expected_throughput": c_exp_tp,
                 "current_throughput": c_curr_tp,
+                "month_throughput": c_month_tp,
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
@@ -830,7 +922,7 @@ class Project(models.Model):
             c_rqc_total = mdm_curr.get("rqc_completed", 0.0)
             c_date_range = _format_cycle_date_range(current_key, today_label)
 
-            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp = _calc_throughput_metrics(
+            c_exp_tp, c_curr_tp, c_tp_gap, c_tp_status, c_tp_label, c_working_days, c_mp, c_month_tp = _calc_throughput_metrics(
                 current_key, today_label, c_receipts_total, cp_curr.get("monthly_actual"), is_current_cycle=True
             )
             c_hc_br = curr_mp_info.get("headcount_branch") or headcount_branch
@@ -857,6 +949,7 @@ class Project(models.Model):
                 "weekly_achieved": cp_curr.get("weekly_achieved"),
                 "expected_throughput": c_exp_tp,
                 "current_throughput": c_curr_tp,
+                "month_throughput": c_month_tp,
                 "throughput_gap": c_tp_gap,
                 "target_achieved_status": c_tp_status,
                 "target_achieved_label": c_tp_label,
@@ -890,16 +983,20 @@ class Project(models.Model):
             m_achieved = active_cycle.get("monthly_achieved")
             m_status_label = active_cycle.get("monthly_status_label", "—")
 
-            expected_throughput = active_cycle.get("expected_throughput")
-            current_throughput = active_cycle.get("current_throughput", 0.0)
-            throughput_gap = active_cycle.get("throughput_gap")
-            target_achieved_status = active_cycle.get("target_achieved_status")
-            target_achieved_label = active_cycle.get("target_achieved_label", "—")
-            throughput_gap_pct = (
-                round((throughput_gap / expected_throughput) * 100, 2)
-                if throughput_gap is not None and expected_throughput
-                else 0.0
-            )
+            # Always maintain Overall Throughput and Quoted Throughput
+            expected_throughput = float(quoted_throughput) if quoted_throughput is not None else 0.0
+            current_throughput = overall_current_throughput
+            if expected_throughput and expected_throughput > 0:
+                target_achieved_status = bool(current_throughput >= expected_throughput)
+                target_achieved_label = "Achieved" if target_achieved_status else "Not Achieved"
+                throughput_gap = round(current_throughput - expected_throughput, 2)
+                throughput_gap_pct = round((throughput_gap / expected_throughput) * 100, 2)
+            else:
+                target_achieved_status = None
+                target_achieved_label = "—"
+                throughput_gap = None
+                throughput_gap_pct = 0.0
+
             target_achieved = current_throughput
             working_days = active_cycle.get("working_days", curr_month_working_days)
             manpower_used = active_cycle.get("manpower_used", curr_manpower)
@@ -948,6 +1045,9 @@ class Project(models.Model):
             "expected_throughput": expected_throughput,
             "current_throughput": current_throughput,
             "quoted_throughput": quoted_throughput,
+            "overall_throughput": overall_current_throughput,
+            "total_inventory_data": total_inv_data,
+            "total_working_days": timeline_days,
             "manpower_used": manpower_used,
             "working_days": working_days,
             "target_achieved": target_achieved,

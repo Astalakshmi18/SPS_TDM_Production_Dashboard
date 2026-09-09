@@ -3,14 +3,15 @@ from django.core.paginator import Paginator
 from django.db.models import Sum
 from django.shortcuts import render, redirect, get_object_or_404
 
-from apps.accounts.decorators import accessible_branches, accessible_projects, branch_queryset, project_queryset
+from apps.accounts.decorators import accessible_branches, accessible_projects, branch_queryset, project_queryset, role_required
+from apps.accounts.models import UserProfile
 from apps.projects.models import Project
 from .models import InventoryItem
 
 
 from django.conf import settings
 
-@login_required
+@role_required(UserProfile.ROLE_ADMIN)
 def inventory_project_list(request):
     """Shows a list of projects so the user can select one to view its inventory."""
     projects = accessible_projects(request).select_related("branch")
@@ -35,7 +36,7 @@ def inventory_project_list(request):
     })
 
 
-@login_required
+@role_required(UserProfile.ROLE_ADMIN)
 def inventory_detail(request, pk):
     """Company-wide inventory tracker: every ingested file/folder row,
     across every project, searchable and filterable - separate from the

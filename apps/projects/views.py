@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
 from django.core.files.storage import default_storage
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -24,36 +24,40 @@ from .models import ImportBatch, Project
 
 @login_required
 def project_list(request):
-    projects = accessible_projects(request).select_related("branch")
+    projects_qs = accessible_projects(request).select_related("branch")
 
-    q = request.GET.get("q", "")
+    q = request.GET.get("q", "").strip()
     branch_code = request.GET.get("branch", "")
-    if q:
-        projects = projects.filter(project_name__icontains=q)
-    if branch_code:
-        projects = projects.filter(branch__code=branch_code)
+    status_filter = request.GET.get("status", "")
 
-    # Branch filter options come from accessible_branches(), NOT the global
-    # settings.BRANCH_CHOICES list - a Manager/PL/PM/Viewer scoped to one
-    # branch used to still see every branch code in the org in this
-    # dropdown, even ones they have zero projects in (picking one just
-    # produced an empty, confusing result since accessible_projects() would
-    # already filter it all out). And per-request: if someone only has ONE
-    # branch to choose from anyway, the dropdown adds nothing - hide it.
+    if q:
+        projects_qs = projects_qs.filter(
+            Q(project_name__icontains=q) |
+            Q(customer_name__icontains=q) |
+            Q(gm_name__icontains=q) |
+            Q(pm_name__icontains=q) |
+            Q(pl_name__icontains=q)
+        )
+    if branch_code:
+        projects_qs = projects_qs.filter(branch__code=branch_code)
+
+    if status_filter:
+        projects = [p for p in projects_qs if p.status == status_filter]
+    else:
+        projects = list(projects_qs)
+
     branches = accessible_branches(request)
 
     return render(request, "projects/list.html", {
         "projects": projects,
         "q": q,
         "branch_code": branch_code,
+        "status_filter": status_filter,
         "branch_choices": [(b.code, b.name) for b in branches],
         "show_branch_filter": branches.count() > 1,
     })
 
 
-# How often the detail page is allowed to auto-pull from Google Sheets for
-# the same project. Keeps "just open the page and it's current" from turning
-# into a fresh download on every single request/refresh.
 AUTO_SYNC_THROTTLE_SECONDS = 300
 
 

@@ -559,6 +559,17 @@ def extract_daily_metric(cache, rule: dict) -> dict | None:
         errors="coerce",
     )
 
+    # Calculate overall total sum of this column across real data rows (excluding trailing Grand Total row)
+    first_col = df.columns[0]
+    if first_col != value_match:
+        df_clean = df[df[first_col].notna()]
+        total_sum = pd.to_numeric(
+            df_clean[value_match].astype(str).str.replace(",", "", regex=False).str.replace("%", "", regex=False),
+            errors="coerce",
+        ).fillna(0).sum()
+    else:
+        total_sum = values.dropna().sum()
+
     if not date_col:
         subset = values[values.notna()]
         if subset.empty:
@@ -566,7 +577,11 @@ def extract_daily_metric(cache, rule: dict) -> dict | None:
         result_value = subset.mean() if agg == "avg" else subset.sum()
         if agg == "avg" and 0 < result_value <= 1.0:
             result_value *= 100.0
-        return {"value": round(float(result_value), 2), "as_of": "all time"}
+        return {
+            "value": round(float(result_value), 2),
+            "as_of": "all time",
+            "total_value": round(float(total_sum), 2),
+        }
 
     date_match = _resolve_column(df, date_col)
     if date_match is None:
@@ -600,7 +615,11 @@ def extract_daily_metric(cache, rule: dict) -> dict | None:
     result_value = subset.mean() if agg == "avg" else subset.sum()
     if agg == "avg" and 0 < result_value <= 1.0:
         result_value *= 100.0
-    return {"value": round(float(result_value), 2), "as_of": target_date.date().isoformat()}
+    return {
+        "value": round(float(result_value), 2),
+        "as_of": target_date.date().isoformat(),
+        "total_value": round(float(total_sum), 2),
+    }
 
 
 def extract_daily_metric_series(cache, rule: dict) -> list:

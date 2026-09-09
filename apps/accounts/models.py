@@ -73,7 +73,7 @@ class UserProfile(models.Model):
 
     @property
     def is_admin(self):
-        return self.role == self.ROLE_ADMIN
+        return self.role == self.ROLE_ADMIN or bool(getattr(self.user, "is_superuser", False))
 
     @property
     def is_manager(self):
@@ -113,10 +113,9 @@ class UserProfile(models.Model):
 
     @property
     def is_project_scoped(self):
-        """True for roles that are restricted below branch level to
-        individually-assigned projects: PM, PL, and VIEWER. MANAGER is
-        branch-scoped only and sees every project in their branches."""
-        return self.role in (self.ROLE_PM, self.ROLE_PL, self.ROLE_VIEWER)
+        """True for all non-admin roles: MANAGER, PM, PL, and VIEWER.
+        Administrator has unrestricted global access."""
+        return not self.is_admin
 
     def accessible_branch_ids(self):
         """None means "all branches" (ADMIN); otherwise a set of allowed branch IDs."""
