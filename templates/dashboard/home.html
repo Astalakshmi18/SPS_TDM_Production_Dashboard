@@ -290,7 +290,7 @@
             {% if cp %}
             {% if cp.pct_by >= target_pct %}
             <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+            {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="ms-cell status-ontrack"
               title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
               <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
@@ -312,7 +312,7 @@
               {% if cp %}
               {% if cp.pct_by >= target_pct %}
               <span class="status-dot status-met" title="Milestone Met"></span>
-              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+              {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="status-dot status-ontrack"
                 title="Future Milestone – On Track"></span>
             {% else %}
             <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
@@ -337,7 +337,7 @@
             {% if cp %}
             {% if cp.pct_by >= target_pct %}
             <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+            {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="ms-cell status-ontrack"
               title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
               <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
@@ -359,7 +359,7 @@
               {% if cp %}
               {% if cp.pct_by >= target_pct %}
               <span class="status-dot status-met" title="Milestone Met"></span>
-              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+              {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="status-dot status-ontrack"
                 title="Future Milestone – On Track"></span>
             {% else %}
             <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
@@ -384,7 +384,7 @@
             {% if cp %}
             {% if cp.pct_by >= target_pct %}
             <span class="ms-cell status-met" title="Milestone Met">{{ cp.date|default:"—" }}</span>
-            {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="ms-cell status-ontrack"
+            {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="ms-cell status-ontrack"
               title="Future Milestone – On Track">{{ cp.date|default:"—" }}</span>
               {% else %}
               <span class="ms-cell status-atrisk" title="Future Milestone – At Risk">{{ cp.date|default:"—" }}</span>
@@ -406,7 +406,7 @@
               {% if cp %}
               {% if cp.pct_by >= target_pct %}
               <span class="status-dot status-met" title="Milestone Met"></span>
-              {% elif today <= cp.date %} {% if cp.status == "green" %} <span class="status-dot status-ontrack"
+              {% elif today <= cp.date %} {% if cp.status=="green" %} <span class="status-dot status-ontrack"
                 title="Future Milestone – On Track"></span>
             {% else %}
             <span class="status-dot status-atrisk" title="Future Milestone – At Risk"></span>
@@ -456,7 +456,7 @@
         <select name="branch" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All Branches</option>
           {% for b in branches %}
-          <option value="{{ b.code }}" {% if selected_branch == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}
+          <option value="{{ b.code }}" {% if selected_branch==b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}
           </option>
           {% endfor %}
         </select>
@@ -465,7 +465,7 @@
         <select name="customer" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All Customers</option>
           {% for c in customers %}
-          <option value="{{ c }}" {% if selected_customer == c %}selected{% endif %}>{{ c }}</option>
+          <option value="{{ c }}" {% if selected_customer==c %}selected{% endif %}>{{ c }}</option>
           {% endfor %}
         </select>
 
@@ -473,7 +473,7 @@
         <select name="gm" class="form-select form-select-sm mb-3" onchange="this.form.submit()">
           <option value="">All GMs</option>
           {% for gm in gms %}
-          <option value="{{ gm }}" {% if selected_gm == gm %}selected{% endif %}>{{ gm }}</option>
+          <option value="{{ gm }}" {% if selected_gm==gm %}selected{% endif %}>{{ gm }}</option>
           {% endfor %}
         </select>
 
@@ -481,7 +481,8 @@
         <select name="project" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="">All Projects</option>
           {% for p in all_projects %}
-          <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
+          <option value="{{ p.pk }}" {% if selected_project==p.pk|stringformat:"s" %}selected{% endif %}>{{
+            p.project_name }}</option>
           {% endfor %}
         </select>
       </form>
