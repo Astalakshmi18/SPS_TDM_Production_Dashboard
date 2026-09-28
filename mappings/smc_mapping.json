@@ -1,7 +1,7 @@
 {
-  "project_key": "NEWSPAPER",
-  "display_name": "Newspaper",
-  "customer_name": "ARC",
+  "project_key": "SMC",
+  "display_name": "SMC",
+  "customer_name": "FS",
   "branch": "TDM",
   "config": {
     "project_name": {
@@ -35,8 +35,8 @@
     },
     "images": {
       "mode": "sum_column",
-      "sheet": "Inventory",
-      "column": "# Images"
+      "sheet": "Calculation",
+      "column": "Total Image"
     },
     "event_type": {
       "mode": "cell",
@@ -81,13 +81,13 @@
       }
     },
     "inventory_rows": {
-      "sheet": "Inventory",
+      "sheet": "Calculation",
       "columns": {
-        "folder_name": "Folder Name",
-        "file_name": "File Name",
-        "image_count": "# Images",
-        "record_count": "Accepted Images",
-        "shipment_date": "Shipment"
+        "file_name": "DGS No",
+        "event_type": "Event Type",
+        "image_count": "Total Image",
+        "record_count": "Total Record",
+        "shipment_date": "Export_Date"
       }
     },
     "pm_name": {
@@ -114,39 +114,53 @@
     "branch_manpower_count": {
       "mode": "header",
       "sheet": "Project Insights",
-      "column": "Head Count",
-      "header_row": 17,
+      "column": "Branch.1",
+      "header_row": 22,
+      "row": -1
+    },
+    "inhouse_manpower_count": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Inhouse.1",
+      "header_row": 22,
       "row": -1
     },
     "throughput_branch": {
       "mode": "header",
       "sheet": "Project Insights",
-      "column": "Throughput",
-      "header_row": 17,
+      "column": "Branch",
+      "header_row": 22,
+      "row": -1
+    },
+    "throughput_inhouse": {
+      "mode": "header",
+      "sheet": "Project Insights",
+      "column": "Inhouse",
+      "header_row": 22,
       "row": -1
     },
     "quoted_throughput": {
       "mode": "cell",
       "sheet": "Project Insights",
-      "cell": "B18"
+      "cell": "B16"
     },
     "weekly_delivery_rows": {
       "sheet": "Weekly Delivery Plan"
     },
     "daily_metrics": {
       "branch_receipt": {
-        "sheet": "Inventory",
-        "date_column": "B",
-        "value_column": "E"
+        "sheet": "Inventory_Index",
+        "date_column": "R",
+        "value_column": "S"
       },
       "rqc_completed": {
-        "sheet": "Inventory",
-        "date_column": "L",
-        "value_column": "M"
+        "sheet": "Inventory_Index",
+        "date_column": "AG",
+        "value_column": "S"
       },
       "rqc_quality_score": {
-        "sheet": "Inventory",
-        "value_column": "AA",
+        "sheet": "Inventory_Index",
+        "value_column": "AH",
         "agg": "avg"
       }
     }

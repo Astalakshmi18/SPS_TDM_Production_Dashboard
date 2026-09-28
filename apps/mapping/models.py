@@ -23,3 +23,22 @@ class ProjectTemplate(models.Model):
 
     def __str__(self):
         return f"{self.project_key} ({self.display_name})"
+
+    @property
+    def is_ancestry_client(self):
+        name = (self.customer_name or "").strip().lower()
+        key = (self.project_key or "").strip().lower()
+        if key in ("anc", "an", "ancestry"):
+            return True
+        if not name:
+            return False
+        return (
+            name in ("ancestry", "an", "anc")
+            or name.startswith("ancestry")
+            or name.startswith("an ")
+            or name.startswith("an/")
+            or name.startswith("an-")
+            or "ancestry" in name
+            or "/an" in name
+            or name.endswith("/an")
+        )

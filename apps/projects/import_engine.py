@@ -610,6 +610,34 @@ def run_import(template, uploaded_file, django_file_field_path, user,
         "summary_snapshot": read_project_summary_snapshot(uploaded_file),
         "operational_snapshot": op_snapshot,
     }
+    cust_name_check = (getattr(template, "customer_name", "") or values.get("customer_name") or "").strip().lower()
+    proj_key_check = (template.project_key or "").strip().lower()
+    if cust_name_check:
+        is_ancestry_import = (
+            cust_name_check in ("ancestry", "an", "anc")
+            or cust_name_check.startswith("ancestry")
+            or cust_name_check.startswith("an ")
+            or cust_name_check.startswith("an/")
+            or cust_name_check.startswith("an-")
+            or "ancestry" in cust_name_check
+            or "/an" in cust_name_check
+            or cust_name_check.endswith("/an")
+        )
+    else:
+        is_ancestry_import = proj_key_check in ("anc", "an", "ancestry")
+
+    if is_ancestry_import:
+        if values.get("milestone_10_date"):
+            defaults["milestone_10_date"] = values.get("milestone_10_date")
+        if values.get("milestone_50_date"):
+            defaults["milestone_50_date"] = values.get("milestone_50_date")
+        if values.get("milestone_100_date"):
+            defaults["milestone_100_date"] = values.get("milestone_100_date")
+    else:
+        defaults["milestone_10_date"] = None
+        defaults["milestone_50_date"] = None
+        defaults["milestone_100_date"] = None
+
     if source_type == ImportBatch.SOURCE_GOOGLE_SHEET and source_url:
         defaults["google_sheet_url"] = source_url
 
@@ -885,6 +913,7 @@ def resync_project(project, user=None):
     by the "Sync Now" button and by the Google Apps Script webhook. Only
     works for projects that were imported from a Google Sheet (google_sheet_url
     is set); returns (project, errors) same shape as run_import."""
+    from django.conf import settings
     from apps.mapping.models import ProjectTemplate
     from .gsheet import download_as_xlsx
 
@@ -894,6 +923,20 @@ def resync_project(project, user=None):
     template = ProjectTemplate.objects.filter(project_key=project.project_key).first()
     if not template:
         return None, [f"No mapping template found for project_key '{project.project_key}'."]
+
+    # Refresh template config from disk if mappings/*.json was updated
+    if hasattr(settings, "MAPPINGS_DIR") and settings.MAPPINGS_DIR.exists():
+        for path in settings.MAPPINGS_DIR.glob("*.json"):
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if data.get("project_key") == project.project_key and "config" in data:
+                    template.config = data["config"]
+                    if data.get("customer_name"):
+                        template.customer_name = data["customer_name"]
+                    template.save(update_fields=["config", "customer_name"])
+                    break
+            except Exception:
+                pass
 
     full_path = download_as_xlsx(project.google_sheet_url)
     try:

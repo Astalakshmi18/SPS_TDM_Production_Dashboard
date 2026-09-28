@@ -1,7 +1,7 @@
 {
-  "project_key": "NEWSPAPER",
-  "display_name": "Newspaper",
-  "customer_name": "ARC",
+  "project_key": "FIJI",
+  "display_name": "Fiji",
+  "customer_name": "FS",
   "branch": "TDM",
   "config": {
     "project_name": {
@@ -36,7 +36,12 @@
     "images": {
       "mode": "sum_column",
       "sheet": "Inventory",
-      "column": "# Images"
+      "column": "# of Images"
+    },
+    "language": {
+      "mode": "cell",
+      "sheet": "Inventory",
+      "cell": "H2"
     },
     "event_type": {
       "mode": "cell",
@@ -83,11 +88,11 @@
     "inventory_rows": {
       "sheet": "Inventory",
       "columns": {
-        "folder_name": "Folder Name",
-        "file_name": "File Name",
-        "image_count": "# Images",
-        "record_count": "Accepted Images",
-        "shipment_date": "Shipment"
+        "folder_name": "Folder",
+        "language": "Language",
+        "image_count": "# of Images",
+        "record_count": "# Characters",
+        "shipment_date": "Shipment Date"
       }
     },
     "pm_name": {
@@ -114,21 +119,21 @@
     "branch_manpower_count": {
       "mode": "header",
       "sheet": "Project Insights",
-      "column": "Head Count",
-      "header_row": 17,
+      "column": "Manpower Used",
+      "header_row": 12,
       "row": -1
     },
     "throughput_branch": {
       "mode": "header",
       "sheet": "Project Insights",
-      "column": "Throughput",
-      "header_row": 17,
+      "column": "Throughtput",
+      "header_row": 12,
       "row": -1
     },
     "quoted_throughput": {
       "mode": "cell",
       "sheet": "Project Insights",
-      "cell": "B18"
+      "cell": "B11"
     },
     "weekly_delivery_rows": {
       "sheet": "Weekly Delivery Plan"
@@ -136,17 +141,17 @@
     "daily_metrics": {
       "branch_receipt": {
         "sheet": "Inventory",
-        "date_column": "B",
-        "value_column": "E"
+        "date_column": "P",
+        "value_column": "R"
       },
       "rqc_completed": {
         "sheet": "Inventory",
-        "date_column": "L",
-        "value_column": "M"
+        "date_column": "AA",
+        "value_column": "AC"
       },
       "rqc_quality_score": {
         "sheet": "Inventory",
-        "value_column": "AA",
+        "value_column": "AI",
         "agg": "avg"
       }
     }

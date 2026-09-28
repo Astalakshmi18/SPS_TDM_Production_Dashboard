@@ -240,9 +240,12 @@
 
           updateActiveSidebarLink(url);
 
-          // Re-execute scripts inside newly fetched page content (e.g., Chart initializers)
+          // Re-execute executable scripts inside newly fetched page content (e.g., Chart initializers)
           var scripts = newContent.querySelectorAll("script");
           scripts.forEach(function (oldScript) {
+            if (oldScript.type && oldScript.type !== "text/javascript" && oldScript.type !== "application/javascript") {
+              return;
+            }
             var newScript = document.createElement("script");
             Array.from(oldScript.attributes).forEach(function (attr) {
               newScript.setAttribute(attr.name, attr.value);
@@ -266,7 +269,7 @@
 
   function initSpaRouter() {
     document.addEventListener("click", function (e) {
-      var link = e.target.closest(".sp-sidebar .nav-link, .sp-offcanvas .nav-link, a.sp-project-link");
+      var link = e.target.closest(".sp-sidebar .nav-link, .sp-offcanvas .nav-link");
       if (!link) return;
 
       var href = link.getAttribute("href");
@@ -320,6 +323,14 @@
     });
   }
 
+  function initModals() {
+    document.addEventListener("show.bs.modal", function (e) {
+      if (e.target && e.target.parentElement !== document.body) {
+        document.body.appendChild(e.target);
+      }
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initCounters();
     initSidebarToggle();
@@ -328,5 +339,6 @@
     initHotStyleSync();
     initTooltips();
     initFadeInOnScroll();
+    initModals();
   });
 })();

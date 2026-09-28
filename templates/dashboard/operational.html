@@ -5,7 +5,8 @@
 
 <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
   <h4 class="fw-bold mb-0" style="color: var(--sp-navy)">Operational Dashboard</h4>
-  <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Production Dashboard</a>
+  <a href="{% url 'dashboard:home' %}" class="btn btn-sm btn-outline-secondary text-nowrap">&larr; Production
+    Dashboard</a>
 </div>
 
 <!-- CEO / MD EXECUTIVE SUMMARY: the whole portfolio condensed to one glance -
@@ -71,7 +72,8 @@
   <select name="project" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
     <option value="">All Projects</option>
     {% for p in all_projects %}
-    <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}</option>
+    <option value="{{ p.pk }}" {% if selected_project == p.pk|stringformat:"s" %}selected{% endif %}>{{ p.project_name }}
+    </option>
     {% endfor %}
   </select>
   {% endif %}
@@ -83,9 +85,11 @@
 <div class="d-flex align-items-center gap-2 mb-3">
   <span class="btn btn-sm disabled" style="background: var(--sp-navy); color: #fff;">Table View</span>
   {% if selected_project %}
-  <a href="{% url 'dashboard:operational_calendar' selected_project %}" class="btn btn-sm btn-outline-secondary">Calendar View</a>
+  <a href="{% url 'dashboard:operational_calendar' selected_project %}"
+    class="btn btn-sm btn-outline-secondary">Calendar View</a>
   {% else %}
-  <span class="btn btn-sm btn-outline-secondary disabled" title="Pick a specific project above first">Calendar View (pick a project above)</span>
+  <span class="btn btn-sm btn-outline-secondary disabled" title="Pick a specific project above first">Calendar View
+    (pick a project above)</span>
   {% endif %}
 </div>
 
@@ -102,7 +106,7 @@
           <th>PM / GM / PL</th>
           <th>Daily Branch<br>Receipt</th>
           <th>Daily RQC<br>Completed</th>
-          <th>Expected<br>Throughput<br><span class="fw-normal text-muted" style="font-size: 0.68rem;">(Quoted)</span></th>
+          <th>Expected<br>Throughput<br><span class="fw-normal text-muted" style="font-size: 0.68rem;"></span></th>
           <th>Current<br>Throughput</th>
           <th>Target<br>Status</th>
           <th>Headcount<br>Branch / In-house</th>
@@ -119,60 +123,65 @@
         {% with p=row.panel %}
         <tr>
           <td>
-            <a href="{% url 'projects:insights' p.project.pk %}" class="fw-semibold text-decoration-none">{{ p.project.project_name }}</a>
-            <a href="{% url 'dashboard:operational_calendar' p.project.pk %}" class="ms-1 small text-muted text-decoration-none" title="Calendar view">📅</a>
+            <a href="{% url 'projects:insights' p.project.pk %}" class="fw-semibold text-decoration-none">{{
+              p.project.project_name }}</a>
+            <a href="{% url 'dashboard:operational_calendar' p.project.pk %}"
+              class="ms-1 small text-muted text-decoration-none" title="Calendar view">📅</a>
           </td>
           <td>{{ p.monthly_plan|default:"—" }}</td>
           <td>{{ p.weekly_plan|default:"—" }}</td>
           <td class="small">{{ p.pm_name|default:"—" }} / {{ p.gm_name|default:"—" }} / {{ p.pl_name|default:"—" }}</td>
           <td>
             {% if p.branch_receipt is not None %}
-              <div class="fw-semibold">{{ p.branch_receipt|floatformat:0|intcomma }}</div>
-              {% if p.branch_receipt_target %}
-                <div class="small text-muted" style="font-size: 0.72rem;">
-                  Tgt: {{ p.branch_receipt_target|floatformat:0|intcomma }}
-                  {% if p.branch_receipt_achieved %}
-                    <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
-                  {% else %}
-                    <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
-                  {% endif %}
-                </div>
+            <div class="fw-semibold">{{ p.branch_receipt|floatformat:0|intcomma }}</div>
+            {% if p.branch_receipt_target %}
+            <div class="small text-muted" style="font-size: 0.72rem;">
+              Tgt: {{ p.branch_receipt_target|floatformat:0|intcomma }}
+              {% if p.branch_receipt_achieved %}
+              <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
+              {% else %}
+              <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
               {% endif %}
+            </div>
+            {% endif %}
             {% else %}
-              <span class="text-muted">—</span>
+            <span class="text-muted">—</span>
             {% endif %}
           <td>
             {% if p.rqc_completed is not None %}
-              <div class="fw-semibold">{{ p.rqc_completed|floatformat:0|intcomma }}</div>
-              {% if p.rqc_target %}
-                <div class="small text-muted" style="font-size: 0.72rem;">
-                  Tgt: {{ p.rqc_target|floatformat:0|intcomma }}
-                  {% if p.rqc_achieved %}
-                    <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
-                  {% else %}
-                    <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
-                  {% endif %}
-                </div>
+            <div class="fw-semibold">{{ p.rqc_completed|floatformat:0|intcomma }}</div>
+            {% if p.rqc_target %}
+            <div class="small text-muted" style="font-size: 0.72rem;">
+              Tgt: {{ p.rqc_target|floatformat:0|intcomma }}
+              {% if p.rqc_achieved %}
+              <span class="text-success fw-bold ms-1" title="Target Achieved">✓</span>
+              {% else %}
+              <span class="text-danger fw-bold ms-1" title="Target Not Achieved">✗</span>
               {% endif %}
+            </div>
+            {% endif %}
             {% else %}
-              <span class="text-muted">—</span>
+            <span class="text-muted">—</span>
             {% endif %}
           </td>
           <td>{{ p.expected_throughput|floatformat:0|intcomma|default:"—" }}</td>
           <td>{{ p.current_throughput|floatformat:0|intcomma|default:"—" }}</td>
           <td>
             {% if p.target_achieved_status is not None %}
-              {% if p.target_achieved_status %}
-              <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Achieved</span>
-              {% else %}
-              <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Not Achieved</span>
-              {% endif %}
+            {% if p.target_achieved_status %}
+            <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill">Achieved</span>
             {% else %}
-              <span class="text-muted">—</span>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill">Not
+              Achieved</span>
+            {% endif %}
+            {% else %}
+            <span class="text-muted">—</span>
             {% endif %}
           <td>{{ p.headcount_branch|default:p.manpower_used|default:"—" }} / {{ p.headcount_inhouse|default:"—" }}</td>
-          <td class="{% if p.variance_vs_plan < 0 %}text-danger{% elif p.variance_vs_plan > 0 %}text-success{% endif %}">
-            {% if p.variance_vs_plan is not None %}{% if p.variance_vs_plan >= 0 %}+{% endif %}{{ p.variance_vs_plan|floatformat:0|intcomma }}{% else %}—{% endif %}
+          <td
+            class="{% if p.variance_vs_plan < 0 %}text-danger{% elif p.variance_vs_plan > 0 %}text-success{% endif %}">
+            {% if p.variance_vs_plan is not None %}{% if p.variance_vs_plan >= 0 %}+{% endif %}{{
+            p.variance_vs_plan|floatformat:0|intcomma }}{% else %}—{% endif %}
           </td>
           <td>{{ p.planned_run_rate|floatformat:0|intcomma|default:"—" }}</td>
           <td>{{ p.current_run_rate|floatformat:0|intcomma|default:"—" }}</td>
@@ -180,7 +189,9 @@
           <td>{{ p.required_headcount|default:"—" }}</td>
           <td>
             {% for alert in row.alerts %}
-            <span class="badge {% if alert.level == 'red' %}bg-danger{% else %}bg-warning text-dark{% endif %} d-block mb-1" title="{{ alert.message }}">
+            <span
+              class="badge {% if alert.level == 'red' %}bg-danger{% else %}bg-warning text-dark{% endif %} d-block mb-1"
+              title="{{ alert.message }}">
               {{ alert.type }}
             </span>
             {% empty %}
@@ -190,7 +201,9 @@
         </tr>
         {% endwith %}
         {% empty %}
-        <tr><td colspan="15" class="text-center text-muted py-4">No projects to show.</td></tr>
+        <tr>
+          <td colspan="15" class="text-center text-muted py-4">No projects to show.</td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>

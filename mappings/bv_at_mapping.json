@@ -1,6 +1,7 @@
 {
   "project_key": "BV_AT",
   "display_name": "Belgium Vitals",
+  "customer_name": "AN",
   "branch": "TDM",
   "config": {
     "project_name": {
@@ -40,22 +41,44 @@
     "total_batches": {
       "mode": "sum_multi",
       "sources": [
-        {"mode": "row_count", "sheet": "BV_Inventory_01"},
-        {"mode": "row_count", "sheet": "BV_Inventory_02"}
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_01"
+        },
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_02"
+        }
       ]
     },
     "promoted": {
       "mode": "sum_multi",
       "sources": [
-        {"mode": "row_count", "sheet": "BV_Inventory_01", "where_column": "Shipment"},
-        {"mode": "row_count", "sheet": "BV_Inventory_02", "where_column": "Shipment"}
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_01",
+          "where_column": "Shipment"
+        },
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_02",
+          "where_column": "Shipment"
+        }
       ]
     },
     "batches_being_keyed": {
       "mode": "sum_multi",
       "sources": [
-        {"mode": "row_count", "sheet": "BV_Inventory_01", "where_column_blank": "Shipment"},
-        {"mode": "row_count", "sheet": "BV_Inventory_02", "where_column_blank": "Shipment"}
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_01",
+          "where_column_blank": "Shipment"
+        },
+        {
+          "mode": "row_count",
+          "sheet": "BV_Inventory_02",
+          "where_column_blank": "Shipment"
+        }
       ]
     },
     "extra_fields": {
@@ -104,6 +127,23 @@
         "record_count": "Total Rec.",
         "shipment_date": "Shipment Date"
       }
+    },
+    "pm_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "Prepapred by",
+      "header_row": 2,
+      "row": -1
+    },
+    "gm_name": {
+      "mode": "header",
+      "sheet": "Version Control",
+      "column": "Approved by",
+      "header_row": 2,
+      "row": -1
+    },
+    "weekly_delivery_rows": {
+      "sheet": "Weekly Delivery Plan"
     }
   }
 }

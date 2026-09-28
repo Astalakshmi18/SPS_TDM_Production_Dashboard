@@ -26,10 +26,10 @@ class Command(BaseCommand):
             self.stdout.write(f"{'Created' if created else 'Exists '} branch {code} - {name}")
 
         if not User.objects.filter(username="admin").exists():
-            admin = User.objects.create_superuser("admin", "admin@swiftprosys.local", "admin12345")
+            admin = User.objects.create_superuser("admin", "admin@swiftprosys.local", "Swift_ProSys")
             admin.profile.role = "ADMIN"
             admin.profile.save()
-            self.stdout.write(self.style.SUCCESS("Created default admin login: admin / admin12345 (change this password immediately)"))
+            self.stdout.write(self.style.SUCCESS("Created default admin login: admin / Swift_ProSys (change this password immediately)"))
         else:
             self.stdout.write("Admin user already exists.")
 

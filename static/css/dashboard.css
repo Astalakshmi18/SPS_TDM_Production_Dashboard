@@ -613,8 +613,16 @@ input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="
 
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
+}
+
+.modal {
+  z-index: 1065 !important;
+}
+
+.modal-backdrop {
+  z-index: 1060 !important;
 }
 
 .sp-alert {

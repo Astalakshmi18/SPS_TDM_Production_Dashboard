@@ -81,7 +81,7 @@
         {% for r in weekly_rows %}
         <tr>
           <td>{{ r.month_label }}</td>
-          <td>{{ r.week.week_label }}</td>
+          <td>Week-{{ r.global_week_num }}</td>
           <td>{{ r.week.shipment_date|date:"d-M-Y (D)"|default:"—" }}</td>
           <td class="text-end sp-num">{{ r.week.plan_records|floatformat:0|intcomma }}</td>
           <td class="text-end sp-num">{{ r.week.actual_records|floatformat:0|intcomma }}</td>

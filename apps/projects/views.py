@@ -1,4 +1,5 @@
 import csv
+import datetime
 import json
 
 from django.conf import settings
@@ -92,16 +93,22 @@ def project_detail(request, pk):
     # the page is opened, so nobody has to click "Sync Now" first to see
     # today's numbers. Throttled per project and silent on failure - the
     # "Sync Now" button is still right there and will surface any error.
+    # Auto-sync: pulls latest Google Sheet data in the background so page load
+    # never hangs on external Google Sheets API network calls.
     if project.google_sheet_url and project.sync_token:
         throttle_key = f"project_autosync_{project.pk}"
         if not cache.get(throttle_key):
             cache.set(throttle_key, True, AUTO_SYNC_THROTTLE_SECONDS)
-            try:
-                updated, errors = resync_project(project, user=request.user)
-                if updated and not errors:
-                    project = updated
-            except GoogleSheetError:
-                pass
+            import threading
+            def _bg_autosync(proj_id, user_obj):
+                try:
+                    from apps.projects.models import Project as PModel
+                    p = PModel.objects.filter(pk=proj_id).first()
+                    if p:
+                        resync_project(p, user=user_obj)
+                except Exception:
+                    pass
+            threading.Thread(target=_bg_autosync, args=(project.pk, request.user), daemon=True).start()
 
     webhook_url = None
     if project.google_sheet_url and project.sync_token:
@@ -135,7 +142,8 @@ def project_detail(request, pk):
                 w.display_variance_pct = round((wv / wp) * 100, 1)
             else:
                 w.display_variance_pct = 0.0
-            weekly_rows.append({"month_label": m["month_label"], "week": w})
+            global_week_num = len(weekly_rows) + 1
+            weekly_rows.append({"month_label": m["month_label"], "week": w, "global_week_num": global_week_num})
 
     monthly_totals = {
         "plan": total_monthly_plan,
@@ -150,12 +158,28 @@ def project_detail(request, pk):
         "actual": [m["monthly_actual"] for m in months],
     }
     weekly_chart = {
-        "labels": [f'{r["month_label"]} {r["week"].week_label}' for r in weekly_rows],
+        "labels": [f'{r["month_label"]} Week-{r["global_week_num"]}' for r in weekly_rows],
         "plan": [r["week"].plan_records for r in weekly_rows],
         "actual": [r["week"].actual_records for r in weekly_rows],
     }
 
     if request.method == "POST" and hasattr(request.user, "profile") and request.user.profile.can_edit_projects:
+        if "update_milestones" in request.POST:
+            if not request.user.profile.is_admin:
+                messages.error(request, "Only administrators are allowed to edit milestone target dates.")
+                return redirect("projects:detail", pk=pk)
+            if project.is_ancestry_client:
+                project.milestone_10_date = _safe_date(request.POST.get("milestone_10_date"))
+                project.milestone_50_date = _safe_date(request.POST.get("milestone_50_date"))
+                project.milestone_100_date = _safe_date(request.POST.get("milestone_100_date"))
+            else:
+                project.milestone_10_date = None
+                project.milestone_50_date = None
+                project.milestone_100_date = None
+            project.save(update_fields=["milestone_10_date", "milestone_50_date", "milestone_100_date"])
+            messages.success(request, "Milestone checkpoint dates updated.")
+            return redirect("projects:detail", pk=pk)
+
         delivered_col = request.POST.get("delivered_column_key", "").strip()
         received_col = request.POST.get("received_column_key", "").strip()
         project.delivered_column_key = delivered_col
@@ -196,7 +220,13 @@ def project_detail(request, pk):
         target_pct = m["expected_pct"]
         m_date = m["date"]
         cp = cps.get(lbl)
-        pct_by = cp["pct_by"] if cp else (project.delivery_percent if lbl == "IDX Start" else 0.0)
+        if cp:
+            pct_by = cp["pct_by"]
+        elif lbl == "IDX Start":
+            shipped_start = project.shipped_records_by(m_date)
+            pct_by = round(min(shipped_start / project.target_records, 1) * 100, 2) if project.target_records else 0.0
+        else:
+            pct_by = 0.0
         cp_status = cp["status"] if cp else m["status"]
 
         if lbl == "IDX Start" or pct_by >= target_pct:
@@ -233,6 +263,7 @@ def project_detail(request, pk):
             "cat_label": cat_label,
             "reached": today >= m_date,
             "status": cp_status,
+            "is_manual": m.get("is_manual", False),
         })
 
     ctx = {
@@ -436,7 +467,8 @@ def weekly_delivery_report(request, pk):
     weekly_rows = []
     for m in months:
         for w in m["weeks"]:
-            weekly_rows.append({"month_label": m["month_label"], "week": w})
+            global_week_num = len(weekly_rows) + 1
+            weekly_rows.append({"month_label": m["month_label"], "week": w, "global_week_num": global_week_num})
 
     monthly_chart = {
         "labels": [m["month_label"] for m in months],
@@ -444,7 +476,7 @@ def weekly_delivery_report(request, pk):
         "actual": [m["monthly_actual"] for m in months],
     }
     weekly_chart = {
-        "labels": [f'{r["month_label"]} {r["week"].week_label}' for r in weekly_rows],
+        "labels": [f'{r["month_label"]} Week-{r["global_week_num"]}' for r in weekly_rows],
         "plan": [r["week"].plan_records for r in weekly_rows],
         "actual": [r["week"].actual_records for r in weekly_rows],
     }
@@ -558,7 +590,20 @@ PROJECT_FORM_FIELDS = [
     "total_batches", "batches_being_keyed", "promoted",
     "language", "vendor", "event_type", "ocr_status",
     "gm_name", "pm_name", "pl_name",
+    "milestone_10_date", "milestone_50_date", "milestone_100_date",
 ]
+
+
+def _safe_date(val):
+    if not val:
+        return None
+    s = str(val).strip()
+    if not s:
+        return None
+    try:
+        return datetime.date.fromisoformat(s)
+    except (ValueError, TypeError):
+        return None
 
 
 @role_required(UserProfile.ROLE_ADMIN, UserProfile.ROLE_MANAGER)
@@ -574,6 +619,9 @@ def project_create(request):
         if not request.user.profile.can_access_branch(branch):
             messages.error(request, "You don't have access to create projects in that branch.")
             return render(request, "projects/form.html", {"branches": branches, "mode": "create"})
+        m10 = _safe_date(data.get("milestone_10_date")) if request.user.profile.is_admin else None
+        m50 = _safe_date(data.get("milestone_50_date")) if request.user.profile.is_admin else None
+        m100 = _safe_date(data.get("milestone_100_date")) if request.user.profile.is_admin else None
         try:
             project = Project.objects.create(
                 project_name=data["project_name"],
@@ -596,7 +644,15 @@ def project_create(request):
                 pm_name=data.get("pm_name", "").strip(),
                 pl_name=data.get("pl_name", "").strip(),
                 google_sheet_url=data.get("google_sheet_url", "").strip(),
+                milestone_10_date=m10,
+                milestone_50_date=m50,
+                milestone_100_date=m100,
             )
+            if not project.is_ancestry_client:
+                project.milestone_10_date = None
+                project.milestone_50_date = None
+                project.milestone_100_date = None
+                project.save(update_fields=["milestone_10_date", "milestone_50_date", "milestone_100_date"])
             messages.success(request, f"Project '{project.project_name}' created.")
             return redirect("projects:detail", pk=project.pk)
         except Exception as exc:
@@ -640,6 +696,19 @@ def project_edit(request, pk):
             project.pm_name = data.get("pm_name", "").strip()
             project.pl_name = data.get("pl_name", "").strip()
             project.google_sheet_url = data.get("google_sheet_url", "").strip()
+            if request.user.profile.is_admin:
+                if project.is_ancestry_client:
+                    project.milestone_10_date = _safe_date(data.get("milestone_10_date"))
+                    project.milestone_50_date = _safe_date(data.get("milestone_50_date"))
+                    project.milestone_100_date = _safe_date(data.get("milestone_100_date"))
+                else:
+                    project.milestone_10_date = None
+                    project.milestone_50_date = None
+                    project.milestone_100_date = None
+            elif not project.is_ancestry_client:
+                project.milestone_10_date = None
+                project.milestone_50_date = None
+                project.milestone_100_date = None
             project.save()
             messages.success(request, f"Project '{project.project_name}' updated.")
             return redirect("projects:detail", pk=project.pk)

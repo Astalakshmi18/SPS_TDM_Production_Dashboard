@@ -89,12 +89,12 @@
     box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
   }
 
-  /* Top 4 Operational KPI Cards */
+  /* Top Operational KPI Cards */
   .ops-kpi-card {
     background: #ffffff;
     border-radius: 14px;
     border: 1px solid rgba(226, 232, 240, 0.85);
-    padding: 1.15rem 1.2rem;
+    padding: clamp(0.85rem, 1vw, 1.15rem) clamp(0.9rem, 1.1vw, 1.2rem);
     position: relative;
     overflow: hidden;
     box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
@@ -103,6 +103,7 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
+    min-width: 0;
   }
 
   .ops-kpi-card:hover {
@@ -115,7 +116,7 @@
     position: absolute;
     right: -10px;
     bottom: -12px;
-    font-size: 4rem;
+    font-size: clamp(3rem, 3.8vw, 4rem);
     opacity: 0.06;
     color: var(--sp-navy);
     pointer-events: none;
@@ -123,34 +124,35 @@
   }
 
   .ops-kpi-title {
-    font-size: 0.72rem;
+    font-size: clamp(0.68rem, 0.75vw, 0.72rem);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.04em;
     color: #64748b;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.35rem;
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.35rem;
   }
 
   .ops-kpi-value {
-    font-size: 1.55rem;
+    font-size: clamp(1.3rem, 1.6vw, 1.55rem);
     font-weight: 800;
     color: var(--sp-navy);
-    line-height: 1.2;
-    margin-bottom: 0.4rem;
+    line-height: 1.15;
+    margin-bottom: 0.35rem;
+    word-break: break-word;
   }
 
   .ops-kpi-sub {
-    font-size: 0.74rem;
+    font-size: 0.73rem;
     color: #64748b;
     border-top: 1px dashed rgba(226, 232, 240, 0.9);
     padding-top: 0.45rem;
     margin-top: 0.45rem;
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 0.35rem;
   }
 
   /* Top 4 Target Records Banner Cards (Matching User UI) */
@@ -293,23 +295,25 @@
   }
 
   .sp-del-card-label {
-    font-size: 0.72rem;
+    font-size: clamp(0.68rem, 0.75vw, 0.72rem);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     color: rgba(255, 255, 255, 0.9);
     margin-bottom: 0.35rem;
     position: relative;
     z-index: 2;
+    white-space: nowrap;
   }
 
   .sp-del-card-val {
-    font-size: 1.65rem;
+    font-size: clamp(1.3rem, 1.6vw, 1.65rem);
     font-weight: 800;
     color: #ffffff;
     line-height: 1.2;
     position: relative;
     z-index: 2;
+    word-break: break-word;
   }
 
   .sp-del-card-icon {
@@ -374,6 +378,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap !important;
+    gap: 0.5rem;
   }
 
   .sp-panel-title {
@@ -383,6 +389,7 @@
     margin: 0;
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.5rem;
   }
 
@@ -857,48 +864,81 @@
     }
   }
 
-  /* Attractive & Responsive Production Cycle Card */
+  /* Attractive & Fully Responsive Production Cycle Card (Mobile, Tablet, Laptop, Desktop) */
   .cycle-card {
-    background: linear-gradient(135deg, #ffffff 0%, #f6f9fc 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #e2e8f0;
     border-left: 4px solid var(--sp-blue, #0d6efd);
     border-radius: 14px;
     box-shadow: 0 4px 18px -2px rgba(13, 110, 253, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.04);
-    padding: 0.85rem 1.25rem;
+    padding: 0.75rem 1.15rem;
     transition: all 0.3s ease;
+    width: 100%;
+    overflow: hidden;
   }
   .cycle-card:hover {
     box-shadow: 0 6px 22px -2px rgba(13, 110, 253, 0.12), 0 2px 8px -1px rgba(0, 0, 0, 0.05);
   }
+  .cycle-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    min-width: 0;
+  }
   .cycle-brand-badge {
     display: inline-flex;
     align-items: center;
-    font-size: 0.72rem;
+    font-size: 0.74rem;
     font-weight: 700;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.05em;
     color: #1e293b;
     text-transform: uppercase;
     background: #f1f5f9;
-    padding: 0.38rem 0.8rem;
+    padding: 0.4rem 0.85rem;
     border-radius: 8px;
     border: 1px solid #e2e8f0;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .cycle-pill-nav {
-    display: inline-flex;
+    display: flex;
     align-items: center;
     gap: 0.35rem;
     background: #ffffff;
-    padding: 0.28rem 0.35rem;
+    padding: 0.28rem 0.45rem;
     border-radius: 50rem;
     border: 1px solid #e2e8f0;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
+    overflow-x: auto;
+    max-width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+  .cycle-pill-nav::-webkit-scrollbar {
+    height: 5px;
+  }
+  .cycle-pill-nav::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+  }
+  .cycle-pill-nav::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+  }
+  .cycle-pill-nav::-webkit-scrollbar-track {
+    background: #f8fafc;
+    border-radius: 4px;
   }
   .cycle-pill-btn {
     display: inline-flex;
     align-items: center;
     gap: 0.45rem;
-    padding: 0.38rem 0.95rem;
+    padding: 0.35rem 0.9rem;
     border-radius: 50rem;
     font-size: 0.78rem;
     font-weight: 600;
@@ -909,6 +949,7 @@
     transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
     text-decoration: none;
     white-space: nowrap;
+    flex-shrink: 0;
   }
   .cycle-pill-btn:hover:not(.active) {
     background-color: #f1f5f9;
@@ -944,6 +985,25 @@
     background-color: #f1f5f9 !important;
     color: #64748b !important;
   }
+  .cycle-select-dropdown {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #1e293b;
+    background-color: #ffffff;
+    border: 1.5px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 0.42rem 2rem 0.42rem 0.75rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    width: 100%;
+  }
+  .cycle-select-dropdown:focus {
+    border-color: #0d6efd;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+  }
+  .cycle-meta-wrapper {
+    flex-shrink: 0;
+  }
   .cycle-meta-card {
     display: inline-flex;
     align-items: center;
@@ -954,6 +1014,7 @@
     border-radius: 50rem;
     font-size: 0.76rem;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    white-space: nowrap;
   }
   .cycle-pulse-dot {
     width: 9px;
@@ -995,31 +1056,284 @@
       box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
     }
   }
-  @media (max-width: 768px) {
-    .cycle-card {
-      padding: 0.75rem 0.9rem;
-      border-radius: 12px;
-    }
-    .cycle-pill-nav {
-      overflow-x: auto;
-      max-width: 100%;
-      scrollbar-width: none;
-    }
-    .cycle-pill-nav::-webkit-scrollbar {
-      display: none;
-    }
-    .cycle-pill-btn {
-      padding: 0.32rem 0.75rem;
-      font-size: 0.74rem;
+
+  /* Wide Laptops and Desktops (>= 1200px): Sleek Single Row */
+  @media (min-width: 1200px) {
+    .cycle-card-body {
+      flex-direction: row;
+      flex-wrap: nowrap;
+      align-items: center;
     }
     .cycle-brand-badge {
-      font-size: 0.68rem;
-      padding: 0.3rem 0.6rem;
+      order: 1;
+      flex-shrink: 0;
+    }
+    .cycle-pill-nav {
+      order: 2;
+      flex: 1 1 auto;
+      min-width: 0;
+      max-width: 100%;
+    }
+    .cycle-meta-wrapper {
+      order: 3;
+      flex-shrink: 0;
+    }
+  }
+
+  /* Tablets & Medium Laptops (768px to 1199.98px): 2-Row Executive Stack */
+  @media (min-width: 768px) and (max-width: 1199.98px) {
+    .cycle-card {
+      padding: 0.75rem 1rem;
+    }
+    .cycle-card-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+    }
+    .cycle-brand-badge {
+      order: 1;
+      flex-shrink: 0;
+      font-size: 0.72rem;
+      padding: 0.35rem 0.75rem;
+    }
+    .cycle-meta-wrapper {
+      order: 2;
+      flex-shrink: 0;
+      margin-left: auto;
+    }
+    .cycle-meta-card {
+      font-size: 0.74rem;
+      padding: 0.35rem 0.85rem;
+    }
+    .cycle-pill-nav {
+      order: 3;
+      width: 100% !important;
+      flex: 1 0 100%;
+      margin-top: 0.2rem;
+    }
+    .cycle-pill-btn {
+      padding: 0.32rem 0.8rem;
+      font-size: 0.75rem;
+    }
+  }
+
+  /* Mobile Screens (< 768px): Clean Vertical Stack with Touch Dropdown */
+  @media (max-width: 767.98px) {
+    .cycle-card {
+      padding: 0.7rem 0.85rem;
+      border-radius: 12px;
+    }
+    .cycle-card-body {
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 0.5rem;
+    }
+    .cycle-brand-badge {
+      order: 1;
+      width: 100%;
+      justify-content: center;
+      font-size: 0.72rem;
+      padding: 0.35rem 0.6rem;
+    }
+    .cycle-mobile-wrapper {
+      order: 2;
+      width: 100%;
+    }
+    .cycle-meta-wrapper {
+      order: 3;
+      width: 100%;
+    }
+    .cycle-meta-card {
+      width: 100%;
+      justify-content: space-between;
+      padding: 0.35rem 0.65rem;
+      font-size: 0.72rem;
+    }
+  }
+  @media (max-width: 991.98px) {
+    .ops-kpi-card {
+      padding: 0.85rem 0.95rem;
+    }
+  }
+  @media (max-width: 768px) {
+    .ops-kpi-value {
+      font-size: 1.35rem;
+    }
+  }
+  @media (max-width: 575.98px) {
+    .sp-project-avatar {
+      width: 42px;
+      height: 42px;
+      font-size: 1.15rem;
+    }
+    .sp-detail-hero .p-3 {
+      padding: 0.85rem 0.85rem !important;
+    }
+    .sp-action-btn {
+      font-size: 0.72rem;
+      padding: 0.28rem 0.6rem;
+    }
+    .sp-chip {
+      font-size: 0.69rem;
+      padding: 0.18rem 0.45rem;
+    }
+    .sp-lead-item {
+      font-size: 0.69rem;
+      padding: 0.2rem 0.45rem;
+      flex-wrap: wrap;
+    }
+    .sp-del-card-target,
+    .sp-del-card-delivered,
+    .sp-del-card-remaining,
+    .sp-del-card-images,
+    .sp-del-card-percent {
+      padding: 0.85rem 1rem;
+      border-radius: 12px;
+    }
+    .sp-del-card-label {
+      white-space: normal;
+      font-size: 0.7rem;
+    }
+    .sp-del-card-val {
+      font-size: 1.35rem;
+      word-break: break-all;
+    }
+    .sp-del-card-icon {
+      font-size: 2.8rem;
+      right: -4px;
+      bottom: -4px;
+    }
+    .cycle-card {
+      padding: 0.65rem 0.75rem;
+    }
+    .cycle-brand-badge {
+      width: 100%;
+      justify-content: center;
+      font-size: 0.72rem;
+      padding: 0.35rem 0.6rem;
     }
     .cycle-meta-card {
       width: 100%;
       justify-content: space-between;
       font-size: 0.72rem;
+      padding: 0.35rem 0.65rem;
+    }
+    .cal-grid-wrapper {
+      padding: 0.5rem;
+    }
+    .cal-weekdays {
+      font-size: 0.65rem;
+      gap: 3px;
+    }
+    .cal-days-grid {
+      gap: 3px;
+    }
+    .cal-day-cell {
+      min-height: 38px;
+      font-size: 0.75rem;
+    }
+    .ops-kpi-card {
+      padding: 0.75rem 0.85rem;
+    }
+    .ops-kpi-value {
+      font-size: 1.25rem;
+    }
+    .sp-leadership-strip {
+      padding: 0.6rem 0.85rem;
+    }
+    .sp-panel-header {
+      padding: 0.65rem 0.85rem;
+      gap: 0.4rem;
+    }
+    .sp-panel-title {
+      font-size: 0.82rem;
+      gap: 0.35rem;
+    }
+    .sp-status-tile {
+      padding: 0.6rem 0.65rem;
+      border-radius: 10px;
+    }
+    .sp-status-tile .fs-5 {
+      font-size: 1.05rem !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .sp-status-tile .small {
+      font-size: 0.66rem !important;
+    }
+    .sp-stat-tile {
+      padding: 0.45rem 0.35rem;
+    }
+    .sp-stat-tile .fs-5 {
+      font-size: 1rem !important;
+      word-break: break-word;
+      overflow-wrap: break-word;
+    }
+    .sp-ms-legend5 {
+      padding: 0.45rem 0.65rem;
+      gap: 0.4rem 0.75rem;
+      font-size: 0.68rem;
+    }
+    .sp-milestone-card {
+      padding: 0.75rem 0.85rem;
+    }
+    .cal-inspector-card {
+      padding: 0.75rem 0.85rem !important;
+    }
+    .cal-stat-box {
+      padding: 0.65rem 0.8rem;
+    }
+    .cal-stat-number {
+      font-size: 1.25rem;
+    }
+    .cal-stat-sub {
+      font-size: 0.68rem;
+      flex-wrap: wrap;
+    }
+  }
+  @media (max-width: 375px) {
+    .sp-del-card-target,
+    .sp-del-card-delivered,
+    .sp-del-card-remaining,
+    .sp-del-card-images,
+    .sp-del-card-percent {
+      padding: 0.7rem 0.8rem;
+    }
+    .sp-del-card-val {
+      font-size: 1.22rem;
+    }
+    .cycle-brand-badge {
+      font-size: 0.66rem;
+      padding: 0.28rem 0.5rem;
+    }
+    .cycle-pill-btn {
+      padding: 0.25rem 0.6rem;
+      font-size: 0.7rem;
+    }
+    .cycle-meta-card {
+      font-size: 0.68rem;
+      padding: 0.3rem 0.5rem;
+    }
+    .sp-panel-header {
+      padding: 0.55rem 0.75rem;
+    }
+    .sp-status-tile {
+      padding: 0.5rem 0.45rem;
+    }
+    .sp-status-tile .fs-5 {
+      font-size: 0.95rem !important;
+    }
+    .sp-status-tile .small {
+      font-size: 0.62rem !important;
+    }
+    .sp-stat-tile .fs-5 {
+      font-size: 0.9rem !important;
+    }
+    .cal-stat-number {
+      font-size: 1.15rem;
     }
   }
 </style>
@@ -1144,35 +1458,35 @@
 
 <!-- 2. TARGET & DELIVERY VOLUME KPI STRIP -->
 <div class="row g-2 g-md-3 mb-3">
-  <div class="col-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="sp-del-card-target">
       <i class="bi bi-bullseye sp-del-card-icon"></i>
       <div class="sp-del-card-label">Target Records</div>
       <div class="sp-del-card-val">{{ project.target_records|default:"0"|floatformat:0|intcomma }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="sp-del-card-images">
       <i class="bi bi-images sp-del-card-icon"></i>
       <div class="sp-del-card-label">Total Images</div>
       <div class="sp-del-card-val">{{ project.total_images|default:"0"|floatformat:0|intcomma }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="sp-del-card-delivered">
       <i class="bi bi-check-circle sp-del-card-icon"></i>
       <div class="sp-del-card-label">Delivered Records</div>
       <div class="sp-del-card-val">{{ project.delivered_records|default:"0"|floatformat:0|intcomma }}</div>
     </div>
   </div>
-  <div class="col-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="sp-del-card-remaining">
       <i class="bi bi-hourglass-split sp-del-card-icon"></i>
       <div class="sp-del-card-label">Remaining Records</div>
       <div class="sp-del-card-val">{{ project.remaining_records|default:"0"|floatformat:0|intcomma }}</div>
     </div>
   </div>
-  <div class="col-12 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="sp-del-card-percent">
       <i class="bi bi-pie-chart sp-del-card-icon"></i>
       <div class="sp-del-card-label">Delivery %</div>
@@ -1187,34 +1501,45 @@
 <!-- Production Cycle Selector Bar (Defaults to Current Month: September 2026, allows viewing August 2026 on demand) -->
 {% if operational.available_cycles %}
 <div class="cycle-card mb-3">
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2.5">
+  <div class="cycle-card-body">
     
-    <!-- Left: Title & Buttons -->
-    <div class="d-flex align-items-center flex-wrap gap-2.5">
-      <div class="cycle-brand-badge">
-        <i class="bi bi-calendar-range-fill me-1.5 text-primary"></i>Production Cycle
-      </div>
-      <div class="cycle-pill-nav" id="cycleToggleGroup">
+    <!-- Brand Badge -->
+    <div class="cycle-brand-badge">
+      <i class="bi bi-calendar-range-fill me-1.5 text-primary"></i>Production Cycle
+    </div>
+    
+    <!-- Mobile Cycle Selector Dropdown (< 768px) -->
+    <div class="d-md-none cycle-mobile-wrapper">
+      <select class="form-select form-select-sm cycle-select-dropdown shadow-sm" id="cycleMobileSelect" onchange="selectCycle(this.value)">
         {% for c in operational.available_cycles %}
-        <button type="button"
-          class="cycle-pill-btn {% if c.is_current %}active{% endif %}"
-          id="cycleBtn_{{ c.month_key }}"
-          onclick="selectCycle('{{ c.month_key }}')">
-          <i class="bi {% if c.is_current %}bi-calendar-check-fill{% else %}bi-calendar-event{% endif %} me-1"
-            id="cycleIcon_{{ c.month_key }}"></i>
-          <span class="cycle-btn-text">{{ c.month_label }}</span>
-          {% if c.is_current %}
-          <span class="badge rounded-pill cycle-status-badge badge-current ms-1">Current</span>
-          {% else %}
-          <span class="badge rounded-pill cycle-status-badge badge-closed ms-1">Closed</span>
-          {% endif %}
-        </button>
+        <option value="{{ c.month_key }}" {% if c.is_current %}selected{% endif %}>
+          {{ c.month_label }}{% if c.is_current %} — Current Month (Live){% else %} — Closed{% endif %}
+        </option>
         {% endfor %}
-      </div>
+      </select>
     </div>
 
-    <!-- Right: Active Status Pill -->
-    <div class="d-flex align-items-center flex-wrap gap-2">
+    <!-- Desktop & Tablet Pill Nav (>= 768px) -->
+    <div class="cycle-pill-nav d-none d-md-flex" id="cycleToggleGroup">
+      {% for c in operational.available_cycles %}
+      <button type="button"
+        class="cycle-pill-btn {% if c.is_current %}active{% endif %}"
+        id="cycleBtn_{{ c.month_key }}"
+        onclick="selectCycle('{{ c.month_key }}')">
+        <i class="bi {% if c.is_current %}bi-calendar-check-fill{% else %}bi-calendar-event{% endif %} me-1"
+          id="cycleIcon_{{ c.month_key }}"></i>
+        <span class="cycle-btn-text">{{ c.month_label }}</span>
+        {% if c.is_current %}
+        <span class="badge rounded-pill cycle-status-badge badge-current ms-1">Current</span>
+        {% else %}
+        <span class="badge rounded-pill cycle-status-badge badge-closed ms-1">Closed</span>
+        {% endif %}
+      </button>
+      {% endfor %}
+    </div>
+
+    <!-- Active Status Pill -->
+    <div class="cycle-meta-wrapper">
       <div class="cycle-meta-card">
         <span class="cycle-pulse-dot" id="cyclePulseDot"></span>
         <span class="text-muted small fw-medium">Active Cycle:</span>
@@ -1232,15 +1557,15 @@
 <!-- 3. TOP 4 EXECUTIVE VELOCITY & HEALTH KPI CARDS (AFTER TARGET RECORDS, BEFORE PRODUCTION BATCHES) -->
 <div class="row g-2 g-md-3 mb-3">
   <!-- KPI 1: Daily Receipts (Synced with Calendar) -->
-  <div class="col-12 col-sm-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="ops-kpi-card h-100" id="kpiReceiptCard" style="cursor: pointer;"
       onclick="document.getElementById('opsCalendarSection').scrollIntoView({behavior: 'smooth'})"
       title="Click to view in Calendar">
       <i class="bi bi-inbox-fill ops-kpi-watermark"></i>
       <div>
-        <div class="ops-kpi-title d-flex align-items-center justify-content-between">
-          <span id="kpiReceiptTitle"><i class="bi bi-calendar2-check-fill text-primary"></i> Daily Receipts</span>
-          <div class="d-flex align-items-center gap-1">
+        <div class="ops-kpi-title d-flex align-items-center justify-content-between flex-wrap gap-1">
+          <span id="kpiReceiptTitle" class="text-nowrap"><i class="bi bi-calendar2-check-fill text-primary"></i> Daily Receipts</span>
+          <div class="d-flex align-items-center gap-1 flex-nowrap">
             <span id="kpiReceiptBadgeContainer">
               {% if operational.branch_receipt_achieved is not None %}
               {% if operational.branch_receipt_achieved %}
@@ -1267,37 +1592,37 @@
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small"><span id="kpiReceiptTargetPrefix">Target:</span> <strong
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+          <span class="text-muted small text-nowrap"><span id="kpiReceiptTargetPrefix">Target:</span> <strong
               class="text-dark fw-bold" id="kpiDailyTarget">{% if operational.branch_receipt_target %}{{ operational.branch_receipt_target|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
           <span
-            class="small fw-bold {% if operational.branch_receipt_achieved %}text-success{% else %}text-danger{% endif %}"
+            class="small fw-bold text-nowrap {% if operational.branch_receipt_achieved %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiDailyReceiptGap">
             {% if operational.branch_receipt_gap is not None %}
             {% if operational.branch_receipt_gap >= 0 %}+{% endif %}{{ operational.branch_receipt_gap|floatformat:0|intcomma }}
             {% endif %}
           </span>
         </div>
-        <div class="d-flex justify-content-between align-items-center small text-muted" style="font-size: 0.7rem;">
-          <span id="kpiReceiptSubtitle">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 small text-muted" style="font-size: 0.7rem;">
+          <span id="kpiReceiptSubtitle" class="text-nowrap">
             <i class="bi bi-buildings text-primary me-1"></i>Branch Intake
           </span>
-          <span class="text-muted" style="font-size: 0.68rem;" id="kpiReceiptSubTarget">Daily Target</span>
+          <span class="text-muted text-nowrap" style="font-size: 0.68rem;" id="kpiReceiptSubTarget">Daily Target</span>
         </div>
       </div>
     </div>
   </div>
 
   <!-- KPI 2: Daily RQC Completed (Synced with Calendar) -->
-  <div class="col-12 col-sm-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="ops-kpi-card h-100" id="kpiRqcCard" style="cursor: pointer;"
       onclick="document.getElementById('opsCalendarSection').scrollIntoView({behavior: 'smooth'})"
       title="Click to view in Calendar">
       <i class="bi bi-shield-check ops-kpi-watermark"></i>
       <div>
-        <div class="ops-kpi-title d-flex align-items-center justify-content-between">
-          <span id="kpiRqcTitle"><i class="bi bi-shield-check text-success"></i> Daily RQC</span>
-          <div class="d-flex align-items-center gap-1">
+        <div class="ops-kpi-title d-flex align-items-center justify-content-between flex-wrap gap-1">
+          <span id="kpiRqcTitle" class="text-nowrap"><i class="bi bi-shield-check text-success"></i> Daily RQC</span>
+          <div class="d-flex align-items-center gap-1 flex-nowrap">
             <span id="kpiRqcBadgeContainer">
               {% if operational.rqc_achieved is not None %}
               {% if operational.rqc_achieved %}
@@ -1324,21 +1649,21 @@
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small"><span id="kpiRqcTargetPrefix">Target:</span> <strong class="text-dark fw-bold"
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+          <span class="text-muted small text-nowrap"><span id="kpiRqcTargetPrefix">Target:</span> <strong class="text-dark fw-bold"
               id="kpiDailyRqcTarget">{% if operational.rqc_target %}{{ operational.rqc_target|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
-          <span class="small fw-bold {% if operational.rqc_achieved %}text-success{% else %}text-danger{% endif %}"
+          <span class="small fw-bold text-nowrap {% if operational.rqc_achieved %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiDailyRqcGap">
             {% if operational.rqc_gap is not None %}
             {% if operational.rqc_gap >= 0 %}+{% endif %}{{ operational.rqc_gap|floatformat:0|intcomma }}
             {% endif %}
           </span>
         </div>
-        <div class="d-flex justify-content-between align-items-center small text-muted" style="font-size: 0.7rem;">
-          <span id="kpiRqcSubtitle">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 small text-muted" style="font-size: 0.7rem;">
+          <span id="kpiRqcSubtitle" class="text-nowrap">
             <i class="bi bi-shield-check text-success me-1"></i>RQC Quality Score
           </span>
-          <span class="badge bg-light text-success border border-success-subtle px-1.5 py-0.5 rounded-pill"
+          <span class="badge bg-light text-success border border-success-subtle px-1.5 py-0.5 rounded-pill text-nowrap"
             style="font-size: 0.68rem;" title="RQC Quality Score" id="kpiRqcQualityVal">
             {% if operational.rqc_quality_score %}{{ operational.rqc_quality_score }}%{% else %}—{% endif %}
           </span>
@@ -1348,27 +1673,27 @@
   </div>
 
   <!-- KPI 3: Expected vs Current Throughput -->
-  <div class="col-12 col-sm-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="ops-kpi-card h-100">
       <i class="bi bi-speedometer2 ops-kpi-watermark"></i>
       <div>
-        <div class="ops-kpi-title d-flex align-items-center justify-content-between">
-          <span><i class="bi bi-speedometer2 text-success"></i> Current Throughput</span>
-          <span id="kpiThroughputBadgeContainer">
+        <div class="ops-kpi-title d-flex align-items-center justify-content-between flex-wrap gap-1">
+          <span class="text-nowrap"><i class="bi bi-speedometer2 text-success"></i> Current Throughput</span>
+          <span id="kpiThroughputBadgeContainer" class="text-nowrap">
             {% if operational.target_achieved_status is not None %}
             {% if operational.target_achieved_status %}
-            <span class="badge bg-success text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;"
+            <span class="badge bg-success text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;"
               id="kpiThroughputBadge">
               <i class="bi bi-check-circle-fill me-1"></i>Achieved
             </span>
             {% else %}
-            <span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;"
+            <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;"
               id="kpiThroughputBadge">
               <i class="bi bi-x-circle-fill me-1"></i>Not Achieved
             </span>
             {% endif %}
             {% else %}
-            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-1" style="font-size: 0.68rem;"
+            <span class="badge bg-secondary-subtle text-secondary rounded-pill px-2 py-0.5" style="font-size: 0.65rem;"
               id="kpiThroughputBadge">—</span>
             {% endif %}
           </span>
@@ -1378,60 +1703,66 @@
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Expected: <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:"0"|intcomma }}{% else %}—{% endif %}</strong></span>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+          <span class="text-muted small text-nowrap">Expected: <strong class="text-dark fw-bold" id="kpiExpectedThroughputVal">{% if operational.expected_throughput %}{{ operational.expected_throughput|floatformat:"0"|intcomma }}{% else %}—{% endif %}</strong></span>
           <span
-            class="small fw-bold {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %}"
+            class="small fw-bold text-nowrap {% if operational.target_achieved_status %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiThroughputGapVal">
             {% if operational.throughput_gap is not None %}
             {% if operational.throughput_gap >= 0 %}+{% endif %}{{ operational.throughput_gap|floatformat:"0"|intcomma }}
             {% endif %}
           </span>
         </div>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 small text-muted" style="font-size: 0.7rem;">
+          <span class="text-nowrap"><i class="bi bi-graph-up me-1 text-primary"></i>Daily Productivity</span>
+          <span class="text-muted text-nowrap" style="font-size: 0.68rem;">Run Target</span>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- KPI 4: Planned Run Rate vs Current Run Rate -->
-  <div class="col-12 col-sm-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="ops-kpi-card h-100">
       <i class="bi bi-lightning-charge-fill ops-kpi-watermark"></i>
       <div>
-        <div class="ops-kpi-title d-flex align-items-center justify-content-between">
-          <span><i class="bi bi-lightning-fill text-warning"></i> Current Run Rate</span>
-          {% if operational.run_rate_achieved is not None %}
-          {% if operational.run_rate_achieved %}
-          <span class="badge bg-success text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;">
-            <i class="bi bi-check-circle-fill me-1"></i>Achieved
+        <div class="ops-kpi-title d-flex align-items-center justify-content-between flex-wrap gap-1">
+          <span class="text-nowrap"><i class="bi bi-lightning-fill text-warning"></i> Current Run Rate</span>
+          <span class="text-nowrap">
+            {% if operational.run_rate_achieved is not None %}
+            {% if operational.run_rate_achieved %}
+            <span class="badge bg-success text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;">
+              <i class="bi bi-check-circle-fill me-1"></i>Achieved
+            </span>
+            {% else %}
+            <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;">
+              <i class="bi bi-x-circle-fill me-1"></i>Not Achieved
+            </span>
+            {% endif %}
+            {% endif %}
           </span>
-          {% else %}
-          <span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;">
-            <i class="bi bi-x-circle-fill me-1"></i>Not Achieved
-          </span>
-          {% endif %}
-          {% endif %}
         </div>
         <div class="ops-kpi-value text-navy mt-1">
           {% if operational.current_run_rate %}{{ operational.current_run_rate|floatformat:0|intcomma }}{% else %}—{% endif %}
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Planned: <strong class="text-dark fw-bold">{% if operational.planned_run_rate %}{{ operational.planned_run_rate|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+          <span class="text-muted small text-nowrap">Planned: <strong class="text-dark fw-bold">{% if operational.planned_run_rate %}{{ operational.planned_run_rate|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
           {% if operational.run_rate_gap is not None %}
-          <span class="small fw-bold {% if operational.run_rate_achieved %}text-success{% else %}text-danger{% endif %}"
+          <span class="small fw-bold text-nowrap {% if operational.run_rate_achieved %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;">
             {% if operational.run_rate_gap >= 0 %}+{% endif %}{{ operational.run_rate_gap|floatformat:0|intcomma }}
           </span>
           {% endif %}
         </div>
-        <div class="d-flex justify-content-between align-items-center small text-muted" style="font-size: 0.7rem;">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 small text-muted" style="font-size: 0.7rem;">
           {% if operational.required_headcount %}
-          <span title="Required Headcount at current productivity">
+          <span class="text-nowrap" title="Required Headcount at current productivity">
             <i class="bi bi-person-check me-1 text-primary"></i>Req HC: <strong>{{ operational.required_headcount|floatformat:0 }}</strong>
           </span>
           {% endif %}
-          <span title="Monthly required run rate from AI sheet">
+          <span class="text-nowrap" title="Monthly required run rate from AI sheet">
             <i class="bi bi-clock-history me-1"></i>Daily Pace
           </span>
         </div>
@@ -1440,21 +1771,21 @@
   </div>
 
   <!-- KPI 5: Monthly Plan Vs Monthly Target Achieved -->
-  <div class="col-12 col-sm-6 col-lg">
+  <div class="col-12 col-sm-6 col-md-4 col-xl">
     <div class="ops-kpi-card h-100">
       <i class="bi bi-calendar-check-fill ops-kpi-watermark"></i>
       <div>
-        <div class="ops-kpi-title d-flex align-items-center justify-content-between">
-          <span><i class="bi bi-calendar-check-fill text-info"></i> Monthly Plan</span>
-          <span id="kpiMonthlyBadgeContainer">
+        <div class="ops-kpi-title d-flex align-items-center justify-content-between flex-wrap gap-1">
+          <span class="text-nowrap"><i class="bi bi-calendar-check-fill text-info"></i> Monthly Plan</span>
+          <span id="kpiMonthlyBadgeContainer" class="text-nowrap">
             {% if operational.monthly_achieved is not None %}
             {% if operational.monthly_achieved %}
-            <span class="badge bg-success text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;"
+            <span class="badge bg-success text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;"
               id="kpiMonthlyBadge">
               <i class="bi bi-check-circle-fill me-1"></i>Achieved
             </span>
             {% else %}
-            <span class="badge bg-danger text-white rounded-pill px-2 py-1 shadow-sm" style="font-size: 0.68rem;"
+            <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 shadow-sm" style="font-size: 0.65rem;"
               id="kpiMonthlyBadge">
               <i class="bi bi-x-circle-fill me-1"></i>Not Achieved
             </span>
@@ -1467,20 +1798,20 @@
         </div>
       </div>
       <div class="ops-kpi-sub d-flex flex-column gap-1 mt-2">
-        <div class="d-flex justify-content-between align-items-center">
-          <span class="text-muted small">Plan: <strong class="text-dark fw-bold" id="kpiMonthlyPlanVal">{% if operational.monthly_plan %}{{ operational.monthly_plan|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
-          <span class="small fw-bold {% if operational.monthly_achieved %}text-success{% else %}text-danger{% endif %}"
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1">
+          <span class="text-muted small text-nowrap">Plan: <strong class="text-dark fw-bold" id="kpiMonthlyPlanVal">{% if operational.monthly_plan %}{{ operational.monthly_plan|floatformat:0|intcomma }}{% else %}—{% endif %}</strong></span>
+          <span class="small fw-bold text-nowrap {% if operational.monthly_achieved %}text-success{% else %}text-danger{% endif %}"
             style="font-size: 0.72rem;" id="kpiMonthlyGapVal">
             {% if operational.monthly_gap is not None %}
             {% if operational.monthly_gap >= 0 %}+{% endif %}{{ operational.monthly_gap|floatformat:0|intcomma }}
             {% endif %}
           </span>
         </div>
-        <div class="d-flex justify-content-between align-items-center small text-muted" style="font-size: 0.7rem;">
-          <span title="Weekly Target Achieved / Plan" id="kpiWeeklyText">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 small text-muted" style="font-size: 0.7rem;">
+          <span class="text-nowrap" title="Weekly Target Achieved / Plan" id="kpiWeeklyText">
             <i class="bi bi-calendar-week me-1 text-primary"></i>Week: <strong id="kpiWeeklyActualVal">{{ operational.weekly_actual|default:"0"|floatformat:0|intcomma }}</strong> / <span id="kpiWeeklyPlanVal">{% if operational.weekly_plan %}{{ operational.weekly_plan|floatformat:0|intcomma }}{% else %}—{% endif %}</span>
           </span>
-          <span id="kpiWeeklyBadgeContainer">
+          <span id="kpiWeeklyBadgeContainer" class="text-nowrap">
             {% if operational.weekly_achieved is not None %}
             {% if operational.weekly_achieved %}
             <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill"
@@ -1539,7 +1870,7 @@
   <!-- Timeline Schedule -->
   <div class="col-lg-6">
     <div class="sp-panel h-100 mb-0 shadow-sm">
-      <div class="sp-panel-header d-flex align-items-center justify-content-between">
+      <div class="sp-panel-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h6 class="sp-panel-title"><i class="bi bi-calendar-check text-success"></i> Timeline Schedule</h6>
         <span class="badge bg-primary-subtle text-primary border px-2 py-1">
           <i class="bi bi-clock-history me-1"></i>{{ project.working_days_completed }} / {{ project.working_days_total }} Days ({{ project.timeline_percent }}%)
@@ -1589,20 +1920,32 @@
       <div class="small text-muted" style="font-size: 0.72rem;">Schedule checkpoints based on cumulative delivery
         progress</div>
     </div>
-    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1.5 fw-bold"
-      style="font-size: 0.72rem;">
-      <i class="bi bi-check2-circle me-1"></i>Current Status:
-      {{ milestones_completed_count }} of {{ milestones|length }} Cleared
-      {% if project.delivery_percent >= 100 %}
-      (100% Completed)
-      {% elif project.delivery_percent >= 50 %}
-      (50% Milestone Cleared)
-      {% elif project.delivery_percent >= 10 %}
-      (10% Milestone Cleared)
-      {% else %}
-      (IDX Started)
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      {% if project.is_ancestry_client %}
+      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1" style="font-size: 0.72rem;">
+        <i class="bi bi-star-fill text-warning me-1"></i>Ancestry / AN
+      </span>
       {% endif %}
-    </span>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1.5 fw-bold"
+        style="font-size: 0.72rem;">
+        <i class="bi bi-check2-circle me-1"></i>Current Status:
+        {{ milestones_completed_count }} of {{ milestones|length }} Cleared
+        {% if project.delivery_percent >= 100 %}
+        (100% Completed)
+        {% elif project.delivery_percent >= 50 %}
+        (50% Milestone Cleared)
+        {% elif project.delivery_percent >= 10 %}
+        (10% Milestone Cleared)
+        {% else %}
+        (IDX Started)
+        {% endif %}
+      </span>
+      {% if project.is_ancestry_client and user.is_authenticated and user.profile.is_admin %}
+      <button type="button" id="btnEditMilestones" class="btn btn-sm btn-outline-primary shadow-sm" data-bs-toggle="modal" data-bs-target="#editMilestonesModal" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+        <i class="bi bi-pencil-square me-1"></i>Edit Dates
+      </button>
+      {% endif %}
+    </div>
   </div>
   <div class="p-3">
     <!-- Milestone Status Legend (5-State Dashboard Colors) -->
@@ -1629,7 +1972,7 @@
           <div>
             <div class="fw-bold fs-6" style="color: var(--sp-navy);">{{ m.label }} Milestone</div>
             <div class="text-muted small mt-1" style="font-size: 0.73rem;">
-              <i class="bi bi-calendar-check text-success me-1"></i>Date: <strong>{{ m.date|date:"M d, Y" }}</strong>
+              <i class="bi bi-calendar-check text-success me-1"></i>Date: <strong>{{ m.date|date:"M d, Y" }}</strong>{% if m.is_manual %}<span class="badge bg-light text-primary border px-1 py-0.5 ms-1" style="font-size: 0.65rem;" title="Ancestry Manual Target Date"><i class="bi bi-pencil-fill me-0.5"></i>Custom</span>{% endif %}
             </div>
             <div class="small text-muted mt-0.5" style="font-size: 0.7rem;">Milestone Met</div>
           </div>
@@ -1639,7 +1982,7 @@
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 0.72rem;">
               <span class="text-success fw-bold"><i class="bi bi-check2-all me-1"></i>Goal: {{ m.expected_pct }}%</span>
-              <span class="text-muted">Actual: <strong class="text-success">{{ m.actual_pct }}%</strong></span>
+              <span class="text-muted" title="Delivered by milestone date: {{ m.pct_by }}% (Current Total: {{ m.actual_pct }}%)">PctBy Date: <strong class="text-success">{{ m.pct_by }}%</strong></span>
             </div>
           </div>
         </div>
@@ -1656,18 +1999,18 @@
           <div>
             <div class="fw-bold fs-6" style="color: var(--sp-navy);">{{ m.label }} Milestone</div>
             <div class="text-muted small mt-1" style="font-size: 0.73rem;">
-              <i class="bi bi-calendar-event text-primary me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>
+              <i class="bi bi-calendar-event text-primary me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>{% if m.is_manual %}<span class="badge bg-light text-primary border px-1 py-0.5 ms-1" style="font-size: 0.65rem;" title="Ancestry Manual Target Date"><i class="bi bi-pencil-fill me-0.5"></i>Custom</span>{% endif %}
             </div>
             <div class="small text-muted mt-0.5" style="font-size: 0.7rem;">Future Milestone &ndash; On Track</div>
           </div>
           <div class="mt-3">
             <div class="progress" style="height: 6px; border-radius: 4px; background: #dbeafe;">
               <div class="progress-bar bg-primary"
-                style="width: {% if m.expected_pct > 0 %}{% widthratio m.actual_pct m.expected_pct 100 %}{% else %}100{% endif %}%;"></div>
+                style="width: {% if m.expected_pct > 0 %}{% widthratio m.pct_by m.expected_pct 100 %}{% else %}100{% endif %}%; max-width: 100%;"></div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 0.72rem;">
               <span class="text-primary fw-bold">Goal: {{ m.expected_pct }}%</span>
-              <span class="text-muted">Actual: <strong class="text-primary">{{ m.actual_pct }}%</strong></span>
+              <span class="text-muted" title="Delivered by milestone date: {{ m.pct_by }}% (Current Total: {{ m.actual_pct }}%)">PctBy Date: <strong class="text-primary">{{ m.pct_by }}%</strong></span>
             </div>
           </div>
         </div>
@@ -1684,18 +2027,18 @@
           <div>
             <div class="fw-bold fs-6" style="color: var(--sp-navy);">{{ m.label }} Milestone</div>
             <div class="small mt-1" style="font-size: 0.73rem; color: #b45309;">
-              <i class="bi bi-calendar-event me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>
+              <i class="bi bi-calendar-event me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>{% if m.is_manual %}<span class="badge bg-light text-primary border px-1 py-0.5 ms-1" style="font-size: 0.65rem;" title="Ancestry Manual Target Date"><i class="bi bi-pencil-fill me-0.5"></i>Custom</span>{% endif %}
             </div>
             <div class="small text-muted mt-0.5" style="font-size: 0.7rem;">Future Milestone &ndash; At Risk</div>
           </div>
           <div class="mt-3">
             <div class="progress" style="height: 6px; border-radius: 4px; background: #fef3c7;">
               <div class="progress-bar"
-                style="background-color: #f59e0b; width: {% if m.expected_pct > 0 %}{% widthratio m.actual_pct m.expected_pct 100 %}{% else %}100{% endif %}%;"></div>
+                style="background-color: #f59e0b; width: {% if m.expected_pct > 0 %}{% widthratio m.pct_by m.expected_pct 100 %}{% else %}100{% endif %}%; max-width: 100%;"></div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 0.72rem;">
               <span class="fw-bold" style="color: #b45309;"><i class="bi bi-exclamation-circle me-1"></i>Goal: {{ m.expected_pct }}%</span>
-              <span class="text-muted">Actual: <strong style="color: #b45309;">{{ m.actual_pct }}%</strong></span>
+              <span class="text-muted" title="Delivered by milestone date: {{ m.pct_by }}% (Current Total: {{ m.actual_pct }}%)">PctBy Date: <strong style="color: #b45309;">{{ m.pct_by }}%</strong></span>
             </div>
           </div>
         </div>
@@ -1712,7 +2055,7 @@
           <div>
             <div class="fw-bold fs-6" style="color: var(--sp-navy);">{{ m.label }} Milestone</div>
             <div class="small mt-1" style="font-size: 0.73rem; color: #6d28d9;">
-              <i class="bi bi-calendar-x me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>
+              <i class="bi bi-calendar-x me-1"></i>Target Date: <strong>{{ m.date|date:"M d, Y" }}</strong>{% if m.is_manual %}<span class="badge bg-light text-primary border px-1 py-0.5 ms-1" style="font-size: 0.65rem;" title="Ancestry Manual Target Date"><i class="bi bi-pencil-fill me-0.5"></i>Custom</span>{% endif %}
             </div>
             <div class="small text-muted mt-0.5" style="font-size: 0.7rem;">Milestone Missed &ndash; Now Complete</div>
           </div>
@@ -1722,7 +2065,7 @@
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 0.72rem;">
               <span class="fw-bold" style="color: #6d28d9;"><i class="bi bi-check2-all me-1"></i>Goal: {{ m.expected_pct }}%</span>
-              <span class="text-muted">Actual: <strong style="color: #6d28d9;">{{ m.actual_pct }}%</strong></span>
+              <span class="text-muted" title="Delivered by milestone date: {{ m.pct_by }}% (Current Total: {{ m.actual_pct }}%)">PctBy Date: <strong style="color: #6d28d9;">{{ m.pct_by }}%</strong></span>
             </div>
           </div>
         </div>
@@ -1739,18 +2082,18 @@
           <div>
             <div class="fw-bold fs-6" style="color: var(--sp-navy);">{{ m.label }} Milestone</div>
             <div class="text-danger small mt-1" style="font-size: 0.73rem;">
-              <i class="bi bi-calendar-x me-1"></i>Passed Date: <strong>{{ m.date|date:"M d, Y" }}</strong>
+              <i class="bi bi-calendar-x me-1"></i>Passed Date: <strong>{{ m.date|date:"M d, Y" }}</strong>{% if m.is_manual %}<span class="badge bg-light text-primary border px-1 py-0.5 ms-1" style="font-size: 0.65rem;" title="Ancestry Manual Target Date"><i class="bi bi-pencil-fill me-0.5"></i>Custom</span>{% endif %}
             </div>
             <div class="small text-muted mt-0.5" style="font-size: 0.7rem;">Milestone Missed &ndash; Incomplete</div>
           </div>
           <div class="mt-3">
             <div class="progress" style="height: 6px; border-radius: 4px; background: #fee2e2;">
               <div class="progress-bar bg-danger"
-                style="width: {% if m.expected_pct > 0 %}{% widthratio m.actual_pct m.expected_pct 100 %}{% else %}0{% endif %}%;"></div>
+                style="width: {% if m.expected_pct > 0 %}{% widthratio m.pct_by m.expected_pct 100 %}{% else %}0{% endif %}%; max-width: 100%;"></div>
             </div>
             <div class="d-flex justify-content-between align-items-center mt-2" style="font-size: 0.72rem;">
               <span class="text-danger fw-bold"><i class="bi bi-arrow-up-right me-1"></i>Goal: {{ m.expected_pct }}%</span>
-              <span class="text-muted">Actual: <strong class="text-danger">{{ m.actual_pct }}%</strong></span>
+              <span class="text-muted" title="Delivered by milestone date: {{ m.pct_by }}% (Current Total: {{ m.actual_pct }}%)">PctBy Date: <strong class="text-danger">{{ m.pct_by }}%</strong></span>
             </div>
           </div>
         </div>
@@ -1760,6 +2103,88 @@
     </div>
   </div>
 </div>
+
+<!-- Modal: Edit Milestone Target Dates (Ancestry & Admin Only) -->
+{% if project.is_ancestry_client and user.is_authenticated and user.profile.is_admin %}
+<div class="modal fade" id="editMilestonesModal" tabindex="-1" aria-labelledby="editMilestonesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header text-white" style="background: var(--sp-navy);">
+        <h6 class="modal-title fw-bold" id="editMilestonesModalLabel">
+          <i class="bi bi-calendar-event me-2"></i>Edit Milestone Target Dates
+        </h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form method="post" action="{% url 'projects:detail' project.pk %}">
+        {% csrf_token %}
+        <input type="hidden" name="update_milestones" value="1">
+        <div class="modal-body p-3">
+          {% if project.is_ancestry_client %}
+          <div class="alert alert-success d-flex align-items-center py-2 px-3 mb-3" style="font-size: 0.8rem;">
+            <i class="bi bi-check-circle-fill text-success fs-5 me-2 flex-shrink-0"></i>
+            <div>
+              <strong>Ancestry / AN Client Active:</strong> Enter custom target dates for 10%, 50%, and 100% milestone checkpoints below.
+            </div>
+          </div>
+          {% else %}
+          <div class="alert alert-info py-2 px-3 mb-3" style="font-size: 0.8rem;">
+            <i class="bi bi-info-circle-fill me-1"></i>
+            For <strong>Ancestry / AN</strong> projects, manually entered dates override the default proportional calculation. Leaving fields blank uses auto-calculated dates.
+          </div>
+          {% endif %}
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-navy">10% Milestone Date</label>
+            <input type="date" name="milestone_10_date" class="form-control"
+                   value="{{ project.milestone_10_date|date:'Y-m-d' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Target date to reach 10% delivery volume.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-navy">50% Milestone Date</label>
+            <input type="date" name="milestone_50_date" class="form-control"
+                   value="{{ project.milestone_50_date|date:'Y-m-d' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Target date to reach 50% delivery volume.</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-bold text-navy">100% Milestone Date</label>
+            <input type="date" name="milestone_100_date" class="form-control"
+                   value="{{ project.milestone_100_date|date:'Y-m-d' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Final completion target date. Defaults to Project End Date if left blank.</div>
+          </div>
+        </div>
+        <div class="modal-footer bg-light py-2">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm text-white" style="background: var(--sp-navy);">
+            <i class="bi bi-check2 me-1"></i>Save Milestone Dates
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+<script>
+  (function() {
+    function ensureModalAttached() {
+      const modal = document.getElementById('editMilestonesModal');
+      if (modal && modal.parentElement !== document.body) {
+        document.body.appendChild(modal);
+      }
+    }
+    ensureModalAttached();
+    document.addEventListener('DOMContentLoaded', ensureModalAttached);
+    document.addEventListener('click', function(e) {
+      const btn = e.target.closest('#btnEditMilestones, [data-bs-target="#editMilestonesModal"]');
+      if (btn) {
+        e.preventDefault();
+        ensureModalAttached();
+        const modalEl = document.getElementById('editMilestonesModal');
+        if (modalEl && typeof bootstrap !== 'undefined' && bootstrap.Modal) {
+          bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+      }
+    });
+  })();
+</script>
+{% endif %}
 {% endif %}
 
 <!-- DYNAMIC DAILY OPERATIONS CALENDAR (INTERACTIVE WORKDAYS CALENDAR) -->
@@ -1768,7 +2193,7 @@
     <div>
       <h6 class="sp-panel-title">
         <i class="bi bi-calendar3-range-fill text-primary"></i> Daily Operations Calendar
-        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill ms-2 fw-bold"
+        <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill fw-bold"
           style="font-size: 0.72rem;">
           <i class="bi bi-briefcase-fill me-1"></i>Working Days (Mon &ndash; Sat)
         </span>
@@ -1909,16 +2334,16 @@
 
           <!-- FOOTER ROLLUP SPECS -->
           <div class="p-2.5 rounded-3 bg-white border shadow-xs">
-            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-calendar2-week me-1 text-primary"></i>Active Week:</span>
-              <strong class="text-dark fw-bold" id="insWeekRange">&mdash;</strong>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1.5" style="font-size: 0.74rem;">
+              <span class="text-muted text-nowrap"><i class="bi bi-calendar2-week me-1 text-primary"></i>Active Week:</span>
+              <strong class="text-dark fw-bold text-nowrap" id="insWeekRange">&mdash;</strong>
             </div>
-            <div class="d-flex align-items-center justify-content-between mb-1.5" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-calendar2-month me-1 text-primary"></i>Active Month:</span>
-              <strong class="text-dark fw-bold" id="insMonthRange">&mdash;</strong>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1 mb-1.5" style="font-size: 0.74rem;">
+              <span class="text-muted text-nowrap"><i class="bi bi-calendar2-month me-1 text-primary"></i>Active Month:</span>
+              <strong class="text-dark fw-bold text-nowrap" id="insMonthRange">&mdash;</strong>
             </div>
-            <div class="d-flex align-items-center justify-content-between" style="font-size: 0.74rem;">
-              <span class="text-muted"><i class="bi bi-patch-check-fill me-1 text-success"></i>RQC Quality:</span>
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-1" style="font-size: 0.74rem;">
+              <span class="text-muted text-nowrap"><i class="bi bi-patch-check-fill me-1 text-success"></i>RQC Quality:</span>
               <span
                 class="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-0.5 fw-bold"
                 id="insQualityScore">{{ operational.rqc_quality_score|default:"—" }}{% if operational.rqc_quality_score %}%{% endif %}</span>
@@ -1935,16 +2360,16 @@
   <!-- PROJECT STATUS PANEL -->
   <div class="col-lg-6">
     <div class="sp-panel h-100 mb-0 shadow-sm">
-      <div class="sp-panel-header d-flex align-items-center justify-content-between">
+      <div class="sp-panel-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h6 class="sp-panel-title">
           <i class="bi bi-send-check-fill text-primary"></i> Project Status
-          <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill ms-2"
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill"
             style="font-size: 0.68rem;">
             Client Delivery Track
           </span>
         </h6>
         {% if project_status.from_excel_formulas %}
-        <span class="badge bg-light text-muted border" style="font-size: 0.65rem;"
+        <span class="badge bg-light text-muted border text-nowrap" style="font-size: 0.65rem;"
           title="Sourced directly from Project Summary sheet formulas">
           <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i>Excel Sourced
         </span>
@@ -2032,16 +2457,16 @@
   <!-- BRANCH STATUS PANEL -->
   <div class="col-lg-6">
     <div class="sp-panel h-100 mb-0 shadow-sm">
-      <div class="sp-panel-header d-flex align-items-center justify-content-between">
+      <div class="sp-panel-header d-flex align-items-center justify-content-between flex-wrap gap-2">
         <h6 class="sp-panel-title">
           <i class="bi bi-inbox-fill text-info"></i> Branch Status
-          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill ms-2"
+          <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle rounded-pill"
             style="font-size: 0.68rem;">
             Inflow Reception Track
           </span>
         </h6>
         {% if branch_status.from_excel_formulas %}
-        <span class="badge bg-light text-muted border" style="font-size: 0.65rem;"
+        <span class="badge bg-light text-muted border text-nowrap" style="font-size: 0.65rem;"
           title="Sourced directly from Project Summary sheet formulas">
           <i class="bi bi-file-earmark-spreadsheet text-success me-1"></i>Excel Sourced
         </span>
@@ -2144,7 +2569,7 @@
         <h6 class="fw-bold m-0 text-navy" style="font-size: 0.85rem; letter-spacing: 0.02em;">
           <i class="bi bi-calendar2-month-fill text-primary me-2"></i>Monthly Delivery: Plan vs Shipped
         </h6>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="delivery-legend-chip">
             <span class="delivery-legend-dot" style="background: #1e3a8a;"></span> Plan
           </span>
@@ -2237,7 +2662,7 @@
         <h6 class="fw-bold m-0 text-navy" style="font-size: 0.85rem; letter-spacing: 0.02em;">
           <i class="bi bi-calendar2-week-fill text-primary me-2"></i>Weekly Delivery: Plan vs Shipped Trend
         </h6>
-        <div class="d-flex align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
           <span class="delivery-legend-chip">
             <span class="delivery-legend-dot" style="background: #1e3a8a;"></span> Weekly Plan
           </span>
@@ -2271,7 +2696,7 @@
                 <td class="fw-semibold text-dark">{{ r.month_label }}</td>
                 <td>
                   <span class="sp-table-badge">
-                    {{ r.week.week_label }}
+                    Week-{{ r.global_week_num }}
                   </span>
                 </td>
                 <td>
@@ -2917,12 +3342,29 @@
   const currentCycleObj = rawCycles.find(c => c.is_current);
   window.currentMonthKey = currentCycleObj ? currentCycleObj.month_key : null;
 
+  // Horizontal mouse wheel scrolling for cycle pills on laptops & desktops
+  const cycleNav = document.getElementById("cycleToggleGroup");
+  if (cycleNav) {
+    cycleNav.addEventListener("wheel", function(e) {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        cycleNav.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+  }
+
   window.selectCycle = function (monthKey) {
     const cycle = rawCycles.find(c => c.month_key === monthKey);
     if (!cycle) return;
 
     const isCurrent = Boolean(cycle.is_current);
     window.activeCycleIsCurrent = isCurrent;
+
+    // Sync mobile select dropdown
+    const mobileSel = document.getElementById("cycleMobileSelect");
+    if (mobileSel && mobileSel.value !== monthKey) {
+      mobileSel.value = monthKey;
+    }
 
     // 1. Update cycle button styles
     rawCycles.forEach(c => {
@@ -2932,6 +3374,7 @@
         if (c.month_key === monthKey) {
           btn.className = "cycle-pill-btn active";
           if (icon) icon.className = "bi bi-calendar-check-fill me-1";
+          btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         } else {
           btn.className = "cycle-pill-btn";
           if (icon) icon.className = "bi bi-calendar-event me-1";

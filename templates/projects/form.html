@@ -92,7 +92,77 @@
                placeholder="https://docs.google.com/spreadsheets/d/....">
         <div class="form-text">If set, "Sync Now" and the auto-sync webhook become available on the project's detail page.</div>
       </div>
+
+      <!-- Milestone Checkpoint Dates (Manual Override for Ancestry / AN & Admin ONLY) -->
+      {% if user.profile.is_admin %}
+      <div class="col-12 mt-3" id="milestoneDatesContainer" style="display: none;">
+        <div class="p-3 rounded border" id="milestoneDatesBox" style="background: #f0fdf4; border-color: #86efac; transition: all 0.2s ease;">
+          <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <h6 class="fw-bold mb-0" style="color: var(--sp-navy); font-size: 0.9rem;">
+              <i class="bi bi-flag-fill text-primary me-1"></i> Milestone Target Dates (Ancestry / AN Checkpoints &ndash; Admin ONLY)
+            </h6>
+            <span id="ancestryBadge" class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="font-size: 0.72rem;">
+              <i class="bi bi-check-circle-fill me-1"></i>Ancestry / AN Client Detected (Manual Input Active)
+            </span>
+          </div>
+          <p class="small text-muted mb-3" style="font-size: 0.78rem;">
+            Custom milestone dates apply strictly to <strong>Ancestry / AN</strong> projects. For all other clients, milestone dates are automatically calculated proportionally from Start Date to End Date.
+          </p>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">10% Milestone Date</label>
+              <input type="date" name="milestone_10_date" id="milestone10Input" class="form-control form-control-sm"
+                     value="{{ project.milestone_10_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">50% Milestone Date</label>
+              <input type="date" name="milestone_50_date" id="milestone50Input" class="form-control form-control-sm"
+                     value="{{ project.milestone_50_date|date:'Y-m-d' }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label small fw-semibold">100% Milestone Date</label>
+              <input type="date" name="milestone_100_date" id="milestone100Input" class="form-control form-control-sm"
+                     value="{{ project.milestone_100_date|date:'Y-m-d' }}">
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
     </div>
+
+    {% if user.profile.is_admin %}
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const custInput = document.querySelector('input[name="customer_name"]');
+      const container = document.getElementById('milestoneDatesContainer');
+      const projKey = '{{ project.project_key|default:"" }}'.trim().toLowerCase();
+
+      function checkAncestry() {
+        const val = (custInput ? custInput.value : '').trim().toLowerCase();
+        let isAncestry = false;
+        if (val) {
+          isAncestry = val === 'ancestry' || val === 'an' || val === 'anc' ||
+                       val.startsWith('ancestry') || val.startsWith('an ') ||
+                       val.startsWith('an/') || val.startsWith('an-') ||
+                       val.includes('ancestry') || val.includes('/an') || val.endsWith('/an');
+        } else {
+          isAncestry = projKey === 'an' || projKey === 'anc' || projKey === 'ancestry';
+        }
+        if (container) {
+          container.style.display = isAncestry ? 'block' : 'none';
+          if (!isAncestry) {
+            container.querySelectorAll('input[type="date"]').forEach(i => i.value = '');
+          }
+        }
+      }
+
+      if (custInput) {
+        custInput.addEventListener('input', checkAncestry);
+      }
+      checkAncestry();
+    });
+    </script>
+    {% endif %}
     <button class="btn text-white mt-3" style="background: var(--sp-navy)">
       {% if mode == "edit" %}Save Changes{% else %}Create Project{% endif %}
     </button>

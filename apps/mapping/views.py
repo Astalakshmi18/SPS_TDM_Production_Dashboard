@@ -32,6 +32,23 @@ def _save_template_to_disk(project_key, display_name, branch_code, config, custo
     (settings.MAPPINGS_DIR / file_name).write_text(json.dumps(data, indent=2))
 
 
+def _is_ancestry_customer(customer_name, project_key):
+    name = (customer_name or "").strip().lower()
+    key = (project_key or "").strip().lower()
+    if name:
+        return (
+            name in ("ancestry", "an", "anc")
+            or name.startswith("ancestry")
+            or name.startswith("an ")
+            or name.startswith("an/")
+            or name.startswith("an-")
+            or "ancestry" in name
+            or "/an" in name
+            or name.endswith("/an")
+        )
+    return key in ("anc", "an", "ancestry")
+
+
 def _ensure_branches_exist():
     if Branch.objects.count() == 0:
         for code, name in getattr(settings, "BRANCH_CHOICES", [("TDM", "Tindivanam"), ("CHN", "Chennai"), ("KPM", "Kanchipuram"), ("MDU", "Madurai")]):
@@ -66,9 +83,16 @@ def template_list(request):
 @role_required(UserProfile.ROLE_ADMIN, UserProfile.ROLE_MANAGER)
 def template_detail(request, pk):
     template = get_object_or_404(branch_queryset(request, ProjectTemplate.objects.all()), pk=pk)
+    cfg = template.config or {}
+    m10_val = cfg.get("milestone_10_date", {}).get("value", "") if isinstance(cfg.get("milestone_10_date"), dict) else ""
+    m50_val = cfg.get("milestone_50_date", {}).get("value", "") if isinstance(cfg.get("milestone_50_date"), dict) else ""
+    m100_val = cfg.get("milestone_100_date", {}).get("value", "") if isinstance(cfg.get("milestone_100_date"), dict) else ""
     return render(request, "mapping/detail.html", {
         "template": template,
         "config_pretty": json.dumps(template.config, indent=2),
+        "milestone_10_date": m10_val,
+        "milestone_50_date": m50_val,
+        "milestone_100_date": m100_val,
     })
 
 
@@ -137,15 +161,52 @@ def template_create(request):
                 "mode": "create", "branches": branches,
                 "project_key": project_key, "display_name": display_name,
                 "customer_name": customer_name, "config_text": config_text,
+                "milestone_10_date": request.POST.get("milestone_10_date", ""),
+                "milestone_50_date": request.POST.get("milestone_50_date", ""),
+                "milestone_100_date": request.POST.get("milestone_100_date", ""),
             })
+
+        m10 = request.POST.get("milestone_10_date", "").strip()
+        m50 = request.POST.get("milestone_50_date", "").strip()
+        m100 = request.POST.get("milestone_100_date", "").strip()
+
+        is_anc = _is_ancestry_customer(customer_name, project_key)
+        if is_anc and request.user.profile.is_admin:
+            if m10:
+                config["milestone_10_date"] = {"mode": "static", "value": m10}
+            if m50:
+                config["milestone_50_date"] = {"mode": "static", "value": m50}
+            if m100:
+                config["milestone_100_date"] = {"mode": "static", "value": m100}
+        elif not is_anc:
+            config.pop("milestone_10_date", None)
+            config.pop("milestone_50_date", None)
+            config.pop("milestone_100_date", None)
+            m10 = m50 = m100 = None
 
         ProjectTemplate.objects.update_or_create(
             project_key=project_key,
             defaults={"display_name": display_name, "customer_name": customer_name, "branch": branch, "config": config},
         )
         _save_template_to_disk(project_key, display_name, branch.code if branch else "TDM", config, customer_name=customer_name)
+        
+        proj_updates = {}
         if customer_name:
-            Project.objects.filter(project_key=project_key).update(customer_name=customer_name)
+            proj_updates["customer_name"] = customer_name
+        if is_anc:
+            if m10:
+                proj_updates["milestone_10_date"] = m10
+            if m50:
+                proj_updates["milestone_50_date"] = m50
+            if m100:
+                proj_updates["milestone_100_date"] = m100
+        else:
+            proj_updates["milestone_10_date"] = None
+            proj_updates["milestone_50_date"] = None
+            proj_updates["milestone_100_date"] = None
+        if proj_updates:
+            Project.objects.filter(project_key=project_key).update(**proj_updates)
+
         messages.success(request, f"Template '{project_key}' created.")
         return redirect("mapping:list")
 
@@ -163,13 +224,20 @@ def template_edit(request, pk):
         branch_code = request.POST.get("branch", "")
         config_text = request.POST.get("config", "{}")
         is_active = bool(request.POST.get("is_active"))
-        new_branch = Branch.objects.filter(code=branch_code).first()
+        new_branch = Branch.objects.filter(code=branch_code).first() or Branch.objects.filter(pk=branch_code).first() if branch_code else template.branch
+        if not new_branch:
+            new_branch = template.branch
+
+        m10 = request.POST.get("milestone_10_date", "").strip()
+        m50 = request.POST.get("milestone_50_date", "").strip()
+        m100 = request.POST.get("milestone_100_date", "").strip()
 
         if not request.user.profile.can_access_branch(new_branch):
             messages.error(request, "You don't have access to move this template to that branch.")
             return render(request, "mapping/form.html", {
                 "mode": "edit", "template": template, "branches": branches,
                 "display_name": display_name, "customer_name": customer_name, "config_text": config_text,
+                "milestone_10_date": m10, "milestone_50_date": m50, "milestone_100_date": m100,
             })
 
         try:
@@ -179,7 +247,34 @@ def template_edit(request, pk):
             return render(request, "mapping/form.html", {
                 "mode": "edit", "template": template, "branches": branches,
                 "display_name": display_name, "customer_name": customer_name, "config_text": config_text,
+                "milestone_10_date": m10, "milestone_50_date": m50, "milestone_100_date": m100,
             })
+
+        is_anc = _is_ancestry_customer(customer_name, template.project_key)
+        if is_anc:
+            if request.user.profile.is_admin:
+                if m10:
+                    config["milestone_10_date"] = {"mode": "static", "value": m10}
+                elif "milestone_10_date" in config and config["milestone_10_date"].get("mode") == "static":
+                    if "milestone_10_date" in request.POST:
+                        config.pop("milestone_10_date", None)
+
+                if m50:
+                    config["milestone_50_date"] = {"mode": "static", "value": m50}
+                elif "milestone_50_date" in config and config["milestone_50_date"].get("mode") == "static":
+                    if "milestone_50_date" in request.POST:
+                        config.pop("milestone_50_date", None)
+
+                if m100:
+                    config["milestone_100_date"] = {"mode": "static", "value": m100}
+                elif "milestone_100_date" in config and config["milestone_100_date"].get("mode") == "static":
+                    if "milestone_100_date" in request.POST:
+                        config.pop("milestone_100_date", None)
+        else:
+            config.pop("milestone_10_date", None)
+            config.pop("milestone_50_date", None)
+            config.pop("milestone_100_date", None)
+            m10 = m50 = m100 = None
 
         template.display_name = display_name
         template.customer_name = customer_name
@@ -188,14 +283,50 @@ def template_edit(request, pk):
         template.is_active = is_active
         template.save()
         _save_template_to_disk(template.project_key, display_name, new_branch.code, config, customer_name=customer_name)
+        
+        proj_updates = {}
         if customer_name:
-            Project.objects.filter(project_key=template.project_key).update(customer_name=customer_name)
+            proj_updates["customer_name"] = customer_name
+        if is_anc:
+            if request.user.profile.is_admin:
+                if m10:
+                    proj_updates["milestone_10_date"] = m10
+                elif "milestone_10_date" in request.POST:
+                    proj_updates["milestone_10_date"] = None
+
+                if m50:
+                    proj_updates["milestone_50_date"] = m50
+                elif "milestone_50_date" in request.POST:
+                    proj_updates["milestone_50_date"] = None
+
+                if m100:
+                    proj_updates["milestone_100_date"] = m100
+                elif "milestone_100_date" in request.POST:
+                    proj_updates["milestone_100_date"] = None
+        else:
+            proj_updates["milestone_10_date"] = None
+            proj_updates["milestone_50_date"] = None
+            proj_updates["milestone_100_date"] = None
+
+        if proj_updates:
+            Project.objects.filter(project_key=template.project_key).update(**proj_updates)
+
         messages.success(request, f"Template '{template.project_key}' updated.")
         return redirect("mapping:detail", pk=template.pk)
+
+    cfg = template.config or {}
+    is_anc = template.is_ancestry_client
+    m10_val = cfg.get("milestone_10_date", {}).get("value", "") if is_anc and isinstance(cfg.get("milestone_10_date"), dict) else ""
+    m50_val = cfg.get("milestone_50_date", {}).get("value", "") if is_anc and isinstance(cfg.get("milestone_50_date"), dict) else ""
+    m100_val = cfg.get("milestone_100_date", {}).get("value", "") if is_anc and isinstance(cfg.get("milestone_100_date"), dict) else ""
 
     return render(request, "mapping/form.html", {
         "mode": "edit", "template": template, "branches": branches,
         "config_text": json.dumps(template.config, indent=2),
+        "milestone_10_date": m10_val,
+        "milestone_50_date": m50_val,
+        "milestone_100_date": m100_val,
+        "is_ancestry": is_anc,
     })
 
 

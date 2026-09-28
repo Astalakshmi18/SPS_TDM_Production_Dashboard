@@ -43,6 +43,11 @@
       "sheet": "Calculation",
       "cell": "E2"
     },
+    "event_type": {
+      "mode": "cell",
+      "sheet": "Project Insights",
+      "cell": "A3"
+    },
     "extra_fields": {
       "Volume Unit": {
         "mode": "cell",
@@ -87,12 +92,9 @@
         "event_type": "Event Type",
         "language": "Language",
         "image_count": "# Images",
-        "record_count": "Accepted Records",
+        "record_count": "Ven's Rec",
         "shipment_date": "Shipment"
       }
-    },
-    "weekly_delivery_rows": {
-      "sheet": "Weekly Delivery Plan"
     },
     "pm_name": {
       "mode": "header",
@@ -119,34 +121,37 @@
       "mode": "header",
       "sheet": "Project Insights",
       "column": "Branch.1",
-      "header_row": 26,
+      "header_row": 31,
       "row": -1
     },
     "inhouse_manpower_count": {
       "mode": "header",
       "sheet": "Project Insights",
       "column": "Inhouse.1",
-      "header_row": 26,
+      "header_row": 31,
       "row": -1
     },
     "throughput_branch": {
       "mode": "header",
       "sheet": "Project Insights",
       "column": "Branch",
-      "header_row": 26,
+      "header_row": 31,
       "row": -1
     },
     "throughput_inhouse": {
       "mode": "header",
       "sheet": "Project Insights",
       "column": "Inhouse",
-      "header_row": 26,
+      "header_row": 31,
       "row": -1
     },
     "quoted_throughput": {
       "mode": "cell",
       "sheet": "Project Insights",
       "cell": "B17"
+    },
+    "weekly_delivery_rows": {
+      "sheet": "Weekly Delivery Plan"
     },
     "daily_metrics": {
       "branch_receipt": {
@@ -156,12 +161,12 @@
       },
       "rqc_completed": {
         "sheet": "Inventory",
-        "date_column": "Y",
+        "date_column": "AK",
         "value_column": "R"
       },
       "rqc_quality_score": {
         "sheet": "Inventory",
-        "value_column": "AC",
+        "value_column": "AL",
         "agg": "avg"
       }
     }

@@ -8,22 +8,25 @@
       {% if mode != "edit" %}
       <div class="col-md-3">
         <label class="form-label">Project Key</label>
-        <input name="project_key" class="form-control" value="{{ project_key|default:'' }}" placeholder="e.g. SSH" required>
+        <input name="project_key" class="form-control" value="{{ project_key|default:'' }}" placeholder="e.g. SSH"
+          required>
       </div>
       {% endif %}
       <div class="{% if mode != 'edit' %}col-md-3{% else %}col-md-4{% endif %}">
         <label class="form-label">Display Name</label>
-        <input name="display_name" class="form-control" value="{% firstof display_name template.display_name '' %}" required>
+        <input name="display_name" class="form-control" value="{% firstof display_name template.display_name '' %}"
+          required>
       </div>
       <div class="{% if mode != 'edit' %}col-md-3{% else %}col-md-4{% endif %}">
         <label class="form-label">Customer Name</label>
-        <input name="customer_name" class="form-control" value="{% firstof customer_name template.customer_name '' %}" placeholder="e.g. Ancestry, FamilySearch">
+        <input name="customer_name" class="form-control" value="{% firstof customer_name template.customer_name '' %}"
+          placeholder="e.g. Ancestry, FamilySearch">
       </div>
       <div class="{% if mode != 'edit' %}col-md-3{% else %}col-md-4{% endif %}">
         <label class="form-label">Branch</label>
         <select name="branch" class="form-select">
           {% for b in branches %}
-            <option value="{{ b.code }}" {% if template.branch.code == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
+          <option value="{{ b.code }}" {% if template.branch.code == b.code %}selected{% endif %}>{{ b.code }} - {{ b.name }}</option>
           {% endfor %}
         </select>
       </div>
@@ -34,13 +37,103 @@
       <label class="form-check-label" for="isActive">Active</label>
     </div>
     {% endif %}
+    <!-- Milestone Target Dates (Ancestry / AN Checkpoints & Admin ONLY) -->
+    {% if user.profile.is_admin %}
+    <div id="milestoneDatesCard" class="card border mb-3 shadow-sm"
+      style="display: none; border-radius: 12px; background: #f8fafc;">
+      <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <div class="fw-bold" style="color: var(--sp-navy); font-size: 0.9rem;">
+            <i class="bi bi-calendar-event text-primary me-1"></i> Milestone Target Dates (Ancestry / AN Checkpoints
+            &ndash; 10%, 50%, 100%)
+          </div>
+          <span id="ancestryTemplateBadge"
+            class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"
+            style="display: none; font-size: 0.72rem;">
+            <i class="bi bi-check-circle-fill me-1"></i>Ancestry / AN Client Detected
+          </span>
+        </div>
+        <p class="text-muted small mb-3" style="font-size: 0.78rem;">
+          Custom milestone target dates apply exclusively to <strong>Ancestry / AN</strong> projects. For all other
+          customers, milestone dates are automatically calculated proportionally from project Start Date to End Date.
+        </p>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">10% Milestone Date</label>
+            <input type="date" name="milestone_10_date" id="milestone10Input" class="form-control form-control-sm"
+              value="{{ milestone_10_date|default:'' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Target date for 10% delivery volume</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">50% Milestone Date</label>
+            <input type="date" name="milestone_50_date" id="milestone50Input" class="form-control form-control-sm"
+              value="{{ milestone_50_date|default:'' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Target date for 50% delivery volume</div>
+          </div>
+          <div class="col-md-4">
+            <label class="form-label small fw-semibold">100% Milestone Date</label>
+            <input type="date" name="milestone_100_date" id="milestone100Input" class="form-control form-control-sm"
+              value="{{ milestone_100_date|default:'' }}">
+            <div class="form-text" style="font-size: 0.72rem;">Target date for 100% project completion</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
     <div class="mb-3">
       <label class="form-label">Mapping Config (JSON)</label>
-      <textarea name="config" class="form-control" rows="16" style="font-family: monospace; font-size: .85rem;" required>{{ config_text|default:"{}" }}</textarea>
-      <div class="form-text">See <code>mappings/*.json</code> in the project root for examples of <code>cell</code>, <code>sum_column</code>, <code>header</code>, and <code>extra_fields</code>/<code>inventory_rows</code> rule shapes.</div>
+      <textarea name="config" class="form-control" rows="16" style="font-family: monospace; font-size: .85rem;"
+        required>{{ config_text|default:"{}" }}</textarea>
+      <div class="form-text">See <code>mappings/*.json</code> in the project root for examples of <code>cell</code>,
+        <code>sum_column</code>, <code>header</code>, and <code>extra_fields</code>/<code>inventory_rows</code> rule
+        shapes.</div>
     </div>
     <button class="btn text-white" style="background: var(--sp-navy)">{% if mode == "edit" %}Save Changes{% else %}Create Template{% endif %}</button>
     <a href="{% url 'mapping:list' %}" class="btn btn-outline-secondary">Cancel</a>
   </form>
 </div>
+
+{% if user.profile.is_admin %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const custInput = document.querySelector('input[name="customer_name"]');
+    const projKeyInput = document.querySelector('input[name="project_key"]');
+    const card = document.getElementById('milestoneDatesCard');
+    const badge = document.getElementById('ancestryTemplateBadge');
+
+    function checkAncestry() {
+      const val = (custInput ? custInput.value : '').trim().toLowerCase();
+      const key = (projKeyInput ? projKeyInput.value : '{{ template.project_key|default:"" }}').trim().toLowerCase();
+      let isAncestry = false;
+      if (val) {
+        isAncestry = val === 'ancestry' || val === 'an' || val === 'anc' ||
+          val.startsWith('ancestry') || val.startsWith('an ') ||
+          val.startsWith('an/') || val.startsWith('an-') ||
+          val.includes('ancestry') || val.includes('/an') || val.endsWith('/an');
+      } else {
+        isAncestry = key === 'an' || key === 'anc' || key === 'ancestry';
+      }
+
+      if (card) {
+        card.style.display = isAncestry ? 'block' : 'none';
+        if (!isAncestry) {
+          card.querySelectorAll('input[type="date"]').forEach(input => input.value = '');
+        }
+      }
+      if (badge) {
+        badge.style.display = isAncestry ? 'inline-flex' : 'none';
+      }
+    }
+
+    if (custInput) {
+      custInput.addEventListener('input', checkAncestry);
+    }
+    if (projKeyInput) {
+      projKeyInput.addEventListener('input', checkAncestry);
+    }
+    checkAncestry();
+  });
+</script>
+{% endif %}
 {% endblock %}

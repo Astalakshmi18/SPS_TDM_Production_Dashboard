@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import ProtectedError
 from django.shortcuts import get_object_or_404, redirect, render
 
 from apps.accounts.decorators import accessible_branches, role_required
@@ -43,15 +44,48 @@ def branch_edit(request, pk):
 @role_required(UserProfile.ROLE_ADMIN)
 def branch_delete(request, pk):
     branch = get_object_or_404(Branch, pk=pk)
+    projects = branch.projects.all()
+    templates = branch.projecttemplate_set.all()
+    has_blockers = projects.exists() or templates.exists()
+
     if request.method == "POST":
-        if branch.projects.exists():
-            messages.error(request, f"Can't delete '{branch.code}' - it still has projects assigned to it.")
-        else:
+        if projects.exists():
+            messages.error(
+                request,
+                f"Can't delete '{branch.code}' - it still has {projects.count()} project(s) assigned to it."
+            )
+            return redirect("branches:list")
+
+        if templates.exists():
+            template_keys = ", ".join(t.project_key for t in templates)
+            messages.error(
+                request,
+                f"Can't delete '{branch.code}' - it is used by mapping template(s): {template_keys}. "
+                f"Please reassign or delete the template(s) first."
+            )
+            return redirect("branches:list")
+
+        try:
             code = branch.code
             branch.delete()
             messages.success(request, f"Branch '{code}' deleted.")
+        except ProtectedError as exc:
+            messages.error(
+                request,
+                f"Cannot delete '{branch.code}' because other records depend on it: {exc}"
+            )
         return redirect("branches:list")
-    return render(request, "branches/confirm_delete.html", {"branch": branch})
+
+    return render(
+        request,
+        "branches/confirm_delete.html",
+        {
+            "branch": branch,
+            "projects": projects,
+            "templates": templates,
+            "has_blockers": has_blockers,
+        },
+    )
 
 
 @role_required(UserProfile.ROLE_ADMIN)

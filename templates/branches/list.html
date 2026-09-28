@@ -12,7 +12,7 @@
     <div class="sp-panel text-center">
       <div class="fs-3 fw-bold" style="color: var(--sp-teal)">{{ b.code }}</div>
       <div>{{ b.name }}</div>
-      <div class="small text-muted mt-1">{{ b.projects.count }} project(s)</div>
+      <div class="small text-muted mt-1">{{ b.projects.count }} project(s){% if b.projecttemplate_set.count %} &bull; {{ b.projecttemplate_set.count }} template(s){% endif %}</div>
       {% if not b.is_active %}<span class="badge bg-secondary mt-1">Inactive</span>{% endif %}
       {% if user.profile.is_admin %}
       <div class="mt-2">

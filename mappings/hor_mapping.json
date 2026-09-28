@@ -1,7 +1,8 @@
 {
   "project_key": "HOR",
   "display_name": "HOR Project (template - adjust sheet/column names once the real file arrives)",
-  "branch": "MDU",
+  "customer_name": "",
+  "branch": "CHN",
   "config": {
     "project_name": {
       "mode": "header",

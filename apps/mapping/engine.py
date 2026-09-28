@@ -79,6 +79,7 @@ STANDARD_SCHEMA = [
     "gm_name", "pm_name", "pl_name",
     "branch_manpower_count", "inhouse_manpower_count",
     "throughput_branch", "throughput_inhouse", "quoted_throughput",
+    "milestone_10_date", "milestone_50_date", "milestone_100_date",
 ]
 
 # Shared by extract_inventory_rows and extract_weekly_delivery_rows to
@@ -377,12 +378,38 @@ _WEEKLY_HEADER_ALIASES = {
     "week": "week_label", "week no": "week_label", "week number": "week_label", "week name": "week_label",
     "date of shipment": "shipment_date", "shipment date": "shipment_date", "ship date": "shipment_date",
     "delivery date": "shipment_date",
+    # Plan columns - various wordings including Fiji's merged "Plan > Records" sub-header
     "plan # records": "plan_records", "plan records": "plan_records", "planned records": "plan_records",
     "plan volume": "plan_records", "target records": "plan_records", "monthly plan": "plan_records",
     "plan": "plan_records",
+    "records": "plan_records",          # Fiji: merged "Plan" header → "Records" sub-column
+    "# records": "plan_records",
+    "plan # page": "plan_records",      # Newspaper: "Plan # Page"
+    "plan # pages": "plan_records",
+    "plan pages": "plan_records",
+    "plan (pages)": "plan_records",
+    "plan # chars": "plan_records",      # SMC: "Plan # Chars"
+    "plan # char": "plan_records",
+    "plan chars": "plan_records",
+    "plan char": "plan_records",
+    "planned chars": "plan_records",
+    "planned char": "plan_records",
+    # Actual columns - various wordings including Fiji's merged "Actual > Shipped Rec" sub-header
     "actual shipped # records": "actual_records", "actual shipped records": "actual_records",
     "actual records": "actual_records", "achieved records": "actual_records", "shipped records": "actual_records",
     "delivered records": "actual_records", "actual": "actual_records", "achieved": "actual_records",
+    "shipped rec": "actual_records",    # Fiji: "Actual > Shipped Rec" sub-column
+    "shipped rec.": "actual_records",
+    "actual shipped rec": "actual_records",
+    "actual shipped # chars": "actual_records",  # SMC: "Actual Shipped # Chars"
+    "actual shipped # char": "actual_records",
+    "actual shipped chars": "actual_records",
+    "actual shipped char": "actual_records",
+    "actual chars": "actual_records",
+    "actual char": "actual_records",
+    "shipped chars": "actual_records",
+    "shipped char": "actual_records",
+    # Variance
     "variance": "variance", "gap": "variance",
     "variance %": "variance_pct", "gap %": "variance_pct", "variance%": "variance_pct",
     "reason": "reason",
@@ -441,9 +468,31 @@ def extract_weekly_delivery_rows(wb, rule: dict) -> list:
     current_month = None
     header_map = None  # {column index: our field name}, reset per month block
     expect_header_next = False
+    check_subheader_next = False  # True after reading first header row - peek to see if next is a sub-header
 
     def _norm(v):
         return " ".join(str(v).split()).strip().lower() if v is not None else ""
+
+    def _build_header_map(row_values):
+        """Map column index → field name using _WEEKLY_HEADER_ALIASES.
+        If multiple columns match the same field name, the first one is used."""
+        hm = {}
+        seen_keys = set()
+        for idx, v in enumerate(row_values):
+            key = _WEEKLY_HEADER_ALIASES.get(_norm(v))
+            if key and key not in seen_keys:
+                hm[idx] = key
+                seen_keys.add(key)
+        return hm
+
+    def _is_all_string_row(row_values):
+        """True if every non-null, non-blank value in the row is a plain string
+        (no numbers, no dates) - the signature of a sub-header row."""
+        non_blank = [
+            v for v in row_values
+            if v is not None and not (isinstance(v, str) and not str(v).strip())
+        ]
+        return bool(non_blank) and all(isinstance(v, str) for v in non_blank)
 
     for row_cells in ws.iter_rows():
         values = [c.value for c in row_cells]
@@ -452,17 +501,30 @@ def extract_weekly_delivery_rows(wb, rule: dict) -> list:
         if title:
             current_month = title
             expect_header_next = True
+            check_subheader_next = False
             header_map = None
             continue
 
         if expect_header_next:
-            header_map = {}
-            for idx, v in enumerate(values):
-                key = _WEEKLY_HEADER_ALIASES.get(_norm(v))
-                if key:
-                    header_map[idx] = key
+            header_map = _build_header_map(values)
             expect_header_next = False
+            check_subheader_next = True  # peek at the very next row
             continue
+
+        if check_subheader_next:
+            check_subheader_next = False
+            if _is_all_string_row(values):
+                # Sub-header row (e.g. Fiji's "Characters | Records | Shipped Char | Shipped Rec | …")
+                # Build a REFINED mapping from these precise column names and prefer it over
+                # the merged-header mapping above - the sub-header cells sit at the exact
+                # column of the data they label, so "Shipped Rec" lands in the right column
+                # rather than "Actual" landing in the Shipped Char column.
+                refined = _build_header_map(values)
+                if refined:
+                    header_map = refined
+                continue  # skip this row as data - it's a header, not a week row
+            # Not a sub-header row - fall through and process it as a data row below
+
 
         if current_month is None or not header_map:
             continue
@@ -701,7 +763,7 @@ def apply_mapping(xls_path, config: dict) -> MappingResult:
                 target.append(f"[{field_name}] {exc}")
                 continue
 
-            if field_name in ("start_date", "end_date"):
+            if field_name in ("start_date", "end_date", "milestone_10_date", "milestone_50_date", "milestone_100_date"):
                 raw = _coerce_date(raw)
                 if raw is None and field_name in REQUIRED_FIELDS:
                     result.errors.append(f"[{field_name}] could not parse a valid date")

@@ -46,6 +46,12 @@ class Project(models.Model):
     event_type = models.CharField(max_length=150, blank=True, default="")
     ocr_status = models.CharField(max_length=100, blank=True, default="")
 
+    # Ancestry / AN custom milestone dates (manual input)
+    # For non-Ancestry clients, these remain empty and dates are auto-calculated.
+    milestone_10_date = models.DateField("10% Milestone Date", null=True, blank=True)
+    milestone_50_date = models.DateField("50% Milestone Date", null=True, blank=True)
+    milestone_100_date = models.DateField("100% Milestone Date", null=True, blank=True)
+
     # Team / ownership (Version Control sheet: "Approved by" = GM,
     # "Prepapred by" = PM, "PL Name" = PL - read via the mapping engine,
     # same as every other field). Free text, not a FK, since these are
@@ -232,6 +238,11 @@ class Project(models.Model):
             return None
         return round(sum(values) / len(values), 2)
 
+    def get_all_weekly_delivery_rows(self):
+        if not hasattr(self, "_cached_weekly_delivery_rows"):
+            self._cached_weekly_delivery_rows = list(self.weekly_delivery_rows.all().order_by("month_start", "sno"))
+        return self._cached_weekly_delivery_rows
+
     def operational_plan_panel(self, cycle_month_start=None):
         """Monthly Plan vs Monthly Target Achieved and Weekly Plan vs Weekly Target Achieved.
         Finds the active month and week with delivery data (strictly defaulting to current
@@ -242,10 +253,13 @@ class Project(models.Model):
         current_key = today.strftime("%Y-%m")
         current_label = today.strftime("%B %Y")
 
+        all_rows = self.get_all_weekly_delivery_rows()
+        total_rows = [r for r in all_rows if r.is_total]
+
         month_row = None
         if cycle_month_start:
             if isinstance(cycle_month_start, (datetime.date, datetime.datetime)):
-                month_row = self.weekly_delivery_rows.filter(month_start=cycle_month_start, is_total=True).first()
+                month_row = next((r for r in total_rows if r.month_start == cycle_month_start), None)
             else:
                 cms_str = str(cycle_month_start).strip()
                 parsed_d = None
@@ -258,16 +272,15 @@ class Project(models.Model):
                     parsed_d = None
 
                 if parsed_d:
-                    month_row = self.weekly_delivery_rows.filter(month_start=parsed_d, is_total=True).first()
+                    month_row = next((r for r in total_rows if r.month_start == parsed_d), None)
 
                 if not month_row:
-                    month_row = (
-                        self.weekly_delivery_rows.filter(month_label__iexact=cms_str, is_total=True).first()
-                        or self.weekly_delivery_rows.filter(month_label__icontains=cms_str, is_total=True).first()
-                    )
+                    cms_lower = cms_str.lower()
+                    month_row = next((r for r in total_rows if r.month_label and r.month_label.lower() == cms_lower), None) or \
+                                next((r for r in total_rows if r.month_label and cms_lower in r.month_label.lower()), None)
         else:
             # Strictly default to CURRENT MONTH first based on system date
-            month_row = self.weekly_delivery_rows.filter(month_start=current_first, is_total=True).first()
+            month_row = next((r for r in total_rows if r.month_start == current_first), None)
 
         # If month_row is not found for the requested/default cycle:
         if not month_row:
@@ -309,8 +322,8 @@ class Project(models.Model):
 
             # If user explicitly requested a specific past cycle that couldn't be matched:
             if cycle_month_start and str(cycle_month_start) not in (str(current_first), current_key, current_label):
-                fallback_row = self.weekly_delivery_rows.filter(is_total=True).order_by("-month_start").first()
-                if fallback_row:
+                if total_rows:
+                    fallback_row = sorted(total_rows, key=lambda r: r.month_start or datetime.date.min, reverse=True)[0]
                     month_row = fallback_row
 
             # If still no month_row (e.g. current month doesn't have delivery row in sheet yet)
@@ -337,17 +350,28 @@ class Project(models.Model):
         # Find corresponding week row for this month
         if month_row:
             target_start = month_row.month_start
-            week_qs = self.weekly_delivery_rows.filter(month_start=target_start, is_total=False)
+            matching_weeks = [r for r in all_rows if not r.is_total and r.month_start == target_start]
             if target_start == current_first:
                 # In current month: pick active/current week
-                week_row = (
-                    week_qs.filter(shipment_date__gte=today).order_by("shipment_date").first()
-                    or week_qs.filter(shipment_date__lte=today).order_by("-shipment_date").first()
-                    or week_qs.first()
-                )
+                future_weeks = [w for w in matching_weeks if w.shipment_date and w.shipment_date >= today]
+                past_weeks = [w for w in matching_weeks if w.shipment_date and w.shipment_date <= today]
+                if future_weeks:
+                    week_row = min(future_weeks, key=lambda w: w.shipment_date)
+                elif past_weeks:
+                    week_row = max(past_weeks, key=lambda w: w.shipment_date)
+                elif matching_weeks:
+                    week_row = matching_weeks[0]
+                else:
+                    week_row = None
             else:
                 # Past month: pick latest week
-                week_row = week_qs.order_by("-shipment_date").first()
+                weeks_with_date = [w for w in matching_weeks if w.shipment_date]
+                if weeks_with_date:
+                    week_row = max(weeks_with_date, key=lambda w: w.shipment_date)
+                elif matching_weeks:
+                    week_row = matching_weeks[-1]
+                else:
+                    week_row = None
         else:
             week_row = None
 
@@ -694,7 +718,7 @@ class Project(models.Model):
 
         # Available Monthly Cycles (e.g. Current September 2026 vs Closed August 2026)
         available_cycles = []
-        delivery_totals = list(self.weekly_delivery_rows.filter(is_total=True).order_by("-month_start"))
+        delivery_totals = sorted([r for r in self.get_all_weekly_delivery_rows() if r.is_total], key=lambda r: r.month_start or datetime.date.min, reverse=True)
         snap_cycles = list(reversed(snap.get("monthly_cycles") or []))
         snap_cycles_by_key = {c.get("month_key"): c for c in snap_cycles if c.get("month_key")}
 
@@ -964,6 +988,15 @@ class Project(models.Model):
         # Strictly ensure that ONLY the system date current month has is_current = True
         for c in available_cycles:
             c["is_current"] = bool(c.get("month_key") == current_key)
+
+        # Sort so current cycle is first, then rest in reverse chronological order
+        current_cycles = [c for c in available_cycles if c.get("is_current")]
+        other_cycles = sorted(
+            [c for c in available_cycles if not c.get("is_current")],
+            key=lambda c: c.get("month_key") or "",
+            reverse=True
+        )
+        available_cycles = current_cycles + other_cycles
 
         active_cycle = next((c for c in available_cycles if c.get("is_current")), None) or (available_cycles[0] if available_cycles else None)
 
@@ -1314,7 +1347,7 @@ class Project(models.Model):
         of individual week rows underneath."""
         from itertools import groupby
 
-        rows = list(self.weekly_delivery_rows.all().order_by("month_start", "sno"))
+        rows = list(self.get_all_weekly_delivery_rows())
         months = []
         for month_label, group in groupby(rows, key=lambda r: r.month_label):
             group = list(group)
@@ -1483,6 +1516,27 @@ class Project(models.Model):
         return ""
 
     @property
+    def is_ancestry_client(self):
+        """Identifies if this project belongs to the Ancestry client (e.g.
+        customer_name or template customer_name has 'Ancestry', 'AN', etc.)."""
+        name = (self.effective_customer_name or "").strip().lower()
+        key = (self.project_key or "").strip().lower()
+        if key in ("anc", "an", "ancestry"):
+            return True
+        if not name:
+            return False
+        return (
+            name in ("ancestry", "an", "anc")
+            or name.startswith("ancestry")
+            or name.startswith("an ")
+            or name.startswith("an/")
+            or name.startswith("an-")
+            or "ancestry" in name
+            or "/an" in name
+            or name.endswith("/an")
+        )
+
+    @property
     def unit(self):
         """Volume unit label ("Records", "Pages", ...) - read straight from
         the Project Summary sheet's C2 cell at import time (see
@@ -1580,6 +1634,8 @@ class Project(models.Model):
         "PctBy X%" milestone columns."""
         if target_date is None:
             return 0
+        if isinstance(target_date, datetime.datetime):
+            target_date = target_date.date()
         column_key = self.delivered_column_key or "record_count"
         return self._sum_inventory_column(column_key, upto_date=target_date)
 
@@ -1620,6 +1676,7 @@ class Project(models.Model):
             out.append({
                 "label": m["label"], "date": m_date, "pct_by": pct_by, "status": status,
                 "status_label": MILESTONE_STATUS_LABELS[status],
+                "is_manual": m.get("is_manual", False),
             })
         return out
 
@@ -1635,17 +1692,32 @@ class Project(models.Model):
                    meaningfully behind pace, OR the checkpoint date has
                    already passed without the target being hit
 
-        For a checkpoint at day N with target T%, the expected delivery
-        *today* is T% scaled by how far through that checkpoint's window we
-        already are (days_elapsed / days_to_checkpoint) - a straight-line
-        "should be here by now" pace. Bands are tight (10 / 25) on purpose so
-        checkpoints don't default to Yellow for the entire project runtime.
+        For Ancestry / AN clients, milestone target dates can be provided as
+        manual inputs (milestone_10_date, milestone_50_date, milestone_100_date).
+        If left blank or for all other clients, target dates are auto-calculated
+        proportionally from start_date to end_date.
         """
         duration = (self.end_date - self.start_date).days or 1
         today = timezone.localdate()
         pts = []
+        is_ancestry = self.is_ancestry_client
         for label, fraction in [("IDX Start", 0.0), ("10%", 0.10), ("50%", 0.50), ("100%", 1.0)]:
-            m_date = self.start_date + datetime.timedelta(days=round(duration * fraction))
+            is_manual = False
+            if is_ancestry:
+                if label == "10%" and self.milestone_10_date:
+                    m_date = self.milestone_10_date
+                    is_manual = True
+                elif label == "50%" and self.milestone_50_date:
+                    m_date = self.milestone_50_date
+                    is_manual = True
+                elif label == "100%" and self.milestone_100_date:
+                    m_date = self.milestone_100_date
+                    is_manual = True
+                else:
+                    m_date = self.start_date + datetime.timedelta(days=round(duration * fraction))
+            else:
+                m_date = self.start_date + datetime.timedelta(days=round(duration * fraction))
+
             target_pct = fraction * 100
 
             if self.delivery_percent >= target_pct:
@@ -1664,6 +1736,7 @@ class Project(models.Model):
                 "status_label": MILESTONE_STATUS_LABELS[status],
                 "reached": today >= m_date, "expected_pct": round(target_pct, 1),
                 "actual_pct": self.delivery_percent,
+                "is_manual": is_manual,
             })
         return pts
 
