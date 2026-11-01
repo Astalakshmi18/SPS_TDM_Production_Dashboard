@@ -14,6 +14,4 @@ python manage.py seed_data        # creates branches, admin login, syncs mapping
 python manage.py runserver
 
 
-Open http://127.0.0.1:8000 and log in with:
-- **username:** `admin`
-- **password:** `Swift_ProSys` (change this immediately — `python manage.py changepassword admin`)
+
